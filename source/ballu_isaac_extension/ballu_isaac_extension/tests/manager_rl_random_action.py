@@ -65,8 +65,8 @@ def main():
 
             # Sample random actions from the uniform distribution
             # Convert 0 to 99 degrees to radians (uniform distribution)
-            min_angle_rad = -100000
-            max_angle_rad = 100000 * torch.pi / 180.0  # Convert 99 degrees to radians
+            min_angle_rad = 0 
+            max_angle_rad = 200 * torch.pi / 180.0  # Convert 99 degrees to radians
             joint_pos_targets = torch.rand_like(env.action_manager.action) * (max_angle_rad - min_angle_rad) + min_angle_rad
             #joint_pos_targets = torch.zeros_like(env.action_manager.action)
             #joint_pos_targets = max_angle_rad * torch.ones_like(env.action_manager.action)

@@ -48,7 +48,7 @@ BALLU_CFG = ArticulationCfg(
             effort_limit=400.0,
             velocity_limit=100.0,
             stiffness=0,
-            damping=1000,
+            damping=10000,
         ),
     },
 )

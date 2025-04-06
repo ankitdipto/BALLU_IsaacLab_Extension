@@ -25,6 +25,9 @@ parser.add_argument("--num_envs", type=int, default=None, help="Number of enviro
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--seed", type=int, default=None, help="Seed used for the environment")
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
+parser.add_argument("--reward_std", type=float, default=None, 
+                   help="Standard deviation for velocity tracking reward (default: sqrt(0.25))")
+
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
 # append AppLauncher cli args
@@ -48,6 +51,7 @@ import gymnasium as gym
 import os
 import torch
 from datetime import datetime
+import math
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -98,6 +102,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         log_dir += f"_{agent_cfg.run_name}"
     log_dir = os.path.join(log_root_path, log_dir)
 
+    if args_cli.reward_std is not None:
+        # set the reward standard deviation for velocity tracking
+        env_cfg.rewards.track_lin_vel_xy_exp.params["std"] = math.sqrt(args_cli.reward_std)
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
     # wrap for video recording

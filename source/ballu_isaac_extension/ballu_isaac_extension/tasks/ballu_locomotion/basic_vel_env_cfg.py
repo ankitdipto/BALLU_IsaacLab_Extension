@@ -16,7 +16,6 @@ from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.utils import configclass
-from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 import isaaclab_tasks.manager_based.classic.cartpole.mdp as mdp
 
@@ -47,33 +46,8 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
-        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=500.0),
+        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=2000.0),
     )
-
-
-##
-# MDP settings
-##
-
-# @configclass
-# class CommandsCfg:
-#     """Command specifications for the MDP."""
-
-#     base_velocity = mdp.UniformVelocityCommandCfg(
-#         asset_name="robot",
-#         resampling_time_range=(10.0, 10.0),
-#         rel_standing_envs=0.02,
-#         rel_heading_envs=1.0,
-#         heading_command=True,
-#         heading_control_stiffness=0.5,
-#         debug_vis=True,
-#         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-#             lin_vel_x=(-1.0, 1.0), 
-#             lin_vel_y=(-1.0, 1.0), 
-#             ang_vel_z=(-1.0, 1.0), 
-#             heading=(-math.pi, math.pi)
-#         ),
-#     )
 
 @configclass
 class ConstantVelCommandCfg:
@@ -97,9 +71,6 @@ class ConstantVelCommandCfg:
 class ActionsCfg:
     """Action specifications for the MDP."""
 
-    #joint_effort = mdp.JointEffortActionCfg(asset_name="robot", 
-    #                                        joint_names=["KNEE_LEFT", "KNEE_RIGHT"], 
-    #                                        scale=100.0)
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=["KNEE_LEFT", "KNEE_RIGHT"],
@@ -120,23 +91,9 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
 
-        # observation terms (order preserved)
-        #base_lin_vel = ObsTerm(func=mdp.base_lin_vel, noise=Unoise(n_min=-0.1, n_max=0.1))
-        #base_ang_vel = ObsTerm(func=mdp.base_ang_vel, noise=Unoise(n_min=-0.2, n_max=0.2))
-        #projected_gravity = ObsTerm(
-        #    func=mdp.projected_gravity,
-        #    noise=Unoise(n_min=-0.05, n_max=0.05),
-        #)
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel) #noise=Unoise(n_min=-0.01, n_max=0.01))
-        joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel) #noise=Unoise(n_min=-1.5, n_max=1.5))
-        #actions = ObsTerm(func=mdp.last_action)
-        # height_scan = ObsTerm(
-        #     func=mdp.height_scan,
-        #     params={"sensor_cfg": SceneEntityCfg("height_scanner")},
-        #     noise=Unoise(n_min=-0.1, n_max=0.1),
-        #     clip=(-1.0, 1.0),
-        # )
+        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
+        joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -150,24 +107,6 @@ class ObservationsCfg:
 class EventCfg:
     """Configuration for events."""
 
-    # reset_ballu_position = EventTerm(
-    #     func=mdp.reset_joints_by_offset,
-    #     mode="reset",
-    #     params={
-    #         "asset_cfg": SceneEntityCfg("robot", joint_names=[
-    #                "NECK",
-    #                "HIP_LEFT",
-    #                "HIP_RIGHT",
-    #                "KNEE_LEFT",
-    #                "KNEE_RIGHT",
-    #                "MOTOR_LEFT",
-    #                "MOTOR_RIGHT"],
-    #         ),
-    #         "position_range": (0, 0),
-    #         "velocity_range": (0, 0),
-    #     },
-    # )
-
     reset_ballu_to_default = EventTerm(
         func=mdp.reset_scene_to_default,
         mode="reset"
@@ -178,13 +117,9 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    # -- task
     track_lin_vel_xy_exp = RewTerm(
         func=mdp.track_lin_vel_xy_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
     )
-    #track_ang_vel_z_exp = RewTerm(
-    #    func=mdp.track_ang_vel_z_exp, weight=0.5, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
-    #)
 
 
 @configclass
@@ -235,11 +170,11 @@ class BALLUEnvCfg(ManagerBasedRLEnvCfg):
     def __post_init__(self) -> None:
         """Post initialization."""
         # general settings
-        self.decimation = 8
+        self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (0, 11.0, 5.0)
+        self.viewer.eye = (0, 18.0, 7.0)
         # simulation settings
-        self.sim.dt = 1 / 160.0
+        self.sim.dt = 1 / 200.0 #160.0
         self.sim.render_interval = self.decimation
         self.sim.disable_contact_processing = True

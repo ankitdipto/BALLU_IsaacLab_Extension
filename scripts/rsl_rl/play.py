@@ -43,6 +43,7 @@ from isaaclab.envs import DirectMARLEnv, multi_agent_to_single_agent
 from isaaclab.utils.dict import print_dict
 from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, export_policy_as_jit, export_policy_as_onnx
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
+import numpy as np
 
 # Import extensions to set up environment tasks
 import ballu_isaac_extension.tasks  # noqa: F401
@@ -104,6 +105,8 @@ def main():
     # reset environment
     obs, _ = env.get_observations()
     timestep = 0
+
+    #all_rewards = []
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -112,14 +115,76 @@ def main():
             actions = policy(obs)
             # env stepping
             obs, _, _, _ = env.step(actions)
+            # Store rewards for plotting
+            #all_rewards.append(rewards.mean().item())  # Store the mean reward across environments
+            #timestep += 1
+
         if args_cli.video:
             timestep += 1
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
 
-    # close the simulator
+        #if timestep == env.max_episode_length:
+        #    break
+
+    #print("Printing root linear velocity history:")
+    # The wrapper might be hiding the actual environment, so we need to access the unwrapped version
+    #root_vel_history = env.unwrapped.root_lin_vel_history
+    #print(f"Number of history entries: {len(root_vel_history)}")
+
+    # close the simulator (Very very important)
     env.close()
+
+    # Plot the velocity history
+    #import matplotlib.pyplot as plt
+
+    # Stack all tensors in the history
+    #stacked_history = torch.stack(root_vel_history)
+    # Calculate average velocity for each environment
+    #avg_velocity = stacked_history.mean(dim=0)
+    # print("Average velocity for each environment:")
+    # for i in range(avg_velocity.shape[0]):
+    #     vx, vy, vz = avg_velocity[i].cpu().tolist()
+    #     magnitude = torch.norm(avg_velocity[i]).item()
+    #     print(f"Environment {i}: vx={vx:.4f}, vy={vy:.4f}, vz={vz:.4f}, magnitude={magnitude:.4f}")
+    # Convert to numpy for plotting
+    #history_np = stacked_history.cpu().numpy()
+
+    # Create plot for each environment
+    #plt.figure(figsize=(12, 8))
+    # Plot for first environment (you can loop for all if needed)
+    #env_idx = 0  # Choose which environment to plot
+
+    # Plot x, y, z components of velocity
+    # plt.subplot(3, 1, 1)
+    # plt.plot(history_np[:, env_idx, 0])
+    # plt.title(f'X Linear Velocity - Env {env_idx}')
+    # plt.grid(True)
+
+    # plt.subplot(3, 1, 2)
+    # plt.plot(history_np[:, env_idx, 1])
+    # plt.title(f'Y Linear Velocity - Env {env_idx}')
+    # plt.grid(True)
+
+    # plt.subplot(3, 1, 3)
+    # plt.plot(history_np[:, env_idx, 2])
+    # plt.title(f'Z Linear Velocity - Env {env_idx}')
+    # plt.grid(True)
+
+    # plt.tight_layout()
+    # plt.savefig(f"debug/root_linear_velocity_env_{env_idx}_3_maj_chg.png")
+    # print(f"Saved velocity plot to debug/root_linear_velocity_env_{env_idx}_3_maj_chg.png")
+
+    # import matplotlib.pyplot as plt
+                
+    # plt.figure(figsize=(10, 6))
+    # plt.plot(np.arange(len(all_rewards)), all_rewards)
+    # plt.xlabel("Timestep")
+    # plt.ylabel("Reward")
+    # plt.title("Rewards per Timestep during Playing")
+    # plt.grid(True)
+    # plt.savefig("debug/rewards_plot_curr_best_policy.png")
 
 
 if __name__ == "__main__":
