@@ -98,41 +98,13 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
         if count % 1000 == 0:
             goal_selector_idx = (goal_selector_idx + 1) % 2
 
-        # if count == 500:
-        #     robot.set_external_force_and_torque(forces=BALLOON_BUOYANCY_FORCE + FORCE_ON_PELVIS, 
-        #                                         torques=torch.zeros(1,3, device=sim.device), 
-        #                                         is_global=True, 
-        #                                         body_ids = [3])
-        #if count > 500:
-            #robot.set_joint_position_target(joint_targets[goal_selector_idx].view(1, -1), joint_ids = [0, 1, 3, 4])
-            #robot.write_data_to_sim()
-
-        
-            # reset counter
-            #count = 0
-            # reset the scene entities
-            # root state
-            # we offset the root state by the origin since the states are written in simulation world frame
-            # if this is not done, then the robots will be spawned at the (0, 0, 0) of the simulation world
-            # root_state = robot.data.default_root_state.clone()
-            # root_state[:, :3] += scene.env_origins
-            # robot.write_root_pose_to_sim(root_state[:, :7])
-            # robot.write_root_velocity_to_sim(root_state[:, 7:])
-            # set joint positions with some noise
-            # joint_pos, joint_vel = robot.data.default_joint_pos.clone(), robot.data.default_joint_vel.clone()
-            # joint_pos += torch.rand_like(joint_pos) * 0.1
-            # robot.write_joint_state_to_sim(joint_pos, joint_vel)
-            # # clear internal buffers
-            # scene.reset()
-            # print("[INFO]: Resetting robot state...")
-        # -- write data to sim
         # I am setting a very high value state for the robot to see how the simulation behaves
-        if count == 0:
-            large_tensor = torch.tensor([1e2, 1e2, 1e2, 1e2, 1e2, 1e2, 1e2])\
-                                    .repeat(scene.num_envs, 1).to(device=sim.device)
+        #if count == 0:
+        #    large_tensor = torch.tensor([1e2, 1e2, 1e2, 1e2, 1e2, 1e2, 1e2])\
+        #                    .repeat(scene.num_envs, 1).to(device=sim.device)
 
-            robot.write_joint_state_to_sim(position = torch.zeros((scene.num_envs, 7), device = sim.device), 
-                                                                  velocity = large_tensor)
+        #    robot.write_joint_state_to_sim(position = torch.zeros((scene.num_envs, 7), device = sim.device), 
+        #                                velocity = large_tensor)
         root_link_lin_vel_history.append(robot.data.root_lin_vel_w[0])
         root_com_lin_vel_history.append(robot.data.root_com_lin_vel_w[0])
         robot_body_lin_vel_w = robot.data.body_lin_vel_w # (num_instances, num_bodies, 3)

@@ -27,6 +27,10 @@ parser.add_argument("--seed", type=int, default=None, help="Seed used for the en
 parser.add_argument("--max_iterations", type=int, default=None, help="RL Policy training iterations.")
 parser.add_argument("--reward_std", type=float, default=None, 
                    help="Standard deviation for velocity tracking reward (default: sqrt(0.25))")
+parser.add_argument("--common_folder", type=str, default=None, 
+                   help="Common folder name for all seeded runs (overrides timestamp-based folders)")
+parser.add_argument("--world", type=bool, default=False, 
+                   help="Use world frame for velocity tracking reward")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -96,17 +100,44 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Logging experiment in directory: {log_root_path}")
-    # specify directory for logging runs: {time-stamp}_{run_name}
-    log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    if agent_cfg.run_name:
-        log_dir += f"_{agent_cfg.run_name}"
-    log_dir = os.path.join(log_root_path, log_dir)
+    
+    # specify directory for logging runs
+    if args_cli.common_folder:
+        # If common_folder is provided, use it instead of timestamp
+        if agent_cfg.run_name:
+            # Include run_name if provided
+            log_dir = os.path.join(log_root_path, args_cli.common_folder, f"seed_{agent_cfg.seed}_{agent_cfg.run_name}")
+        else:
+            # Just use seed if no run_name
+            log_dir = os.path.join(log_root_path, args_cli.common_folder, f"seed_{agent_cfg.seed}")
+        print(f"[INFO] Using common folder: {args_cli.common_folder}")
+    else:
+        # Original timestamp-based directory
+        log_dir = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        if agent_cfg.run_name:
+            log_dir += f"_{agent_cfg.run_name}"
+        log_dir = os.path.join(log_root_path, log_dir)
+
+    if args_cli.world:
+        # Zero out the base frame reward
+        env_cfg.rewards.track_lin_vel_xy_base_exp.weight = 0.0
+        # Set the world frame reward to 1.0
+        env_cfg.rewards.track_lin_vel_xy_world_exp.weight = 1.0
+
+    else:
+        # Zero out the world frame reward
+        env_cfg.rewards.track_lin_vel_xy_world_exp.weight = 0.0
+        # Set the base frame reward to 1.0
+        env_cfg.rewards.track_lin_vel_xy_base_exp.weight = 1.0
 
     if args_cli.reward_std is not None:
+        raise ValueError("Reward standard deviation is not supported for this task.")
         # set the reward standard deviation for velocity tracking
         env_cfg.rewards.track_lin_vel_xy_exp.params["std"] = math.sqrt(args_cli.reward_std)
+    
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+
     # wrap for video recording
     if args_cli.video:
         video_kwargs = {

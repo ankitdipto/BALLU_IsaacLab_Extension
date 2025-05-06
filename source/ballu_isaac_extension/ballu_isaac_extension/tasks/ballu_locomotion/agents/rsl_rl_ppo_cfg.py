@@ -3,9 +3,9 @@ from isaaclab.utils import configclass
 
 @configclass
 class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    num_steps_per_env = 24 # Number of steps per environment before a policy update
+    num_steps_per_env = 21 # Number of steps per environment before a policy update
     max_iterations = 1500 # Maximum number of policy upd iterations during training
-    save_interval = 50
+    save_interval = 500
     experiment_name = "ballu_locomotion"
     empirical_normalization = False  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically

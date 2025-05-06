@@ -23,7 +23,7 @@ import isaaclab_tasks.manager_based.classic.cartpole.mdp as mdp
 # Pre-defined configs
 ##
 
-from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_CFG
+from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_CFG, BALLU_HIP_fixed_CFG
 
 ##
 # Scene definition
@@ -173,7 +173,8 @@ class BALLUEnvCfg(ManagerBasedRLEnvCfg):
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (0, 18.0, 7.0)
+        self.viewer.eye = (0, 7, 3.0)
+        #self.viewer.resolution = (1280, 720)
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
         self.sim.render_interval = self.decimation

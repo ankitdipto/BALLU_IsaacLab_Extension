@@ -3,7 +3,7 @@
 #
 # SPDX-License-Identifier: BSD-3-Clause
 
-"""This sub-module contains the functions that are specific to the cartpole environments."""
+"""This sub-module contains the functions that are specific to the BALLU environments."""
 
 from isaaclab.envs.mdp import *  # noqa: F401, F403
 
