@@ -176,4 +176,5 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.sim.dt = 1 / 200.0 #160.0
         self.sim.render_interval = self.decimation
         self.sim.disable_contact_processing = True
-        self.sim.physx.solver_type = 0 # Projected Gauss-Seidel
+        #self.sim.physx.solver_type = 0 # Projected Gauss-Seidel
+        self.sim.physx.solver_type = 1 # Truncated Gauss-Seidel

@@ -29,7 +29,7 @@ parser.add_argument("--reward_std", type=float, default=None,
                    help="Standard deviation for velocity tracking reward (default: sqrt(0.25))")
 parser.add_argument("--common_folder", type=str, default=None, 
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
-parser.add_argument("--world", type=bool, default=False, 
+parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
 
 # append RSL-RL cli arguments

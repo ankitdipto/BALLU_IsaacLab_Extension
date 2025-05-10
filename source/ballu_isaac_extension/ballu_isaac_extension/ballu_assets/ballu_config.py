@@ -38,7 +38,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         # Define actuators for MOTOR joints to accept position commands from action space
         "motor_actuators": ImplicitActuatorCfg(
             joint_names_expr=["MOTOR_LEFT", "MOTOR_RIGHT"],
-            effort_limit=400.0,
+            effort_limit=1.0,
             velocity_limit=100.0,
             stiffness=100.0,
             damping=10,

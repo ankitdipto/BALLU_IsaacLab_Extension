@@ -24,7 +24,7 @@ import ballu_isaac_extension.tasks.ballu_locomotion.mdp as mdp
 # Pre-defined configs
 ##
 
-from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_CFG
+from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_REAL_CFG
 
 ##
 # Scene definition
@@ -42,7 +42,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     )
 
     # BALLU robot
-    robot: ArticulationCfg = BALLU_CFG.replace(
+    robot: ArticulationCfg = BALLU_REAL_CFG.replace(
         prim_path="{ENV_REGEX_NS}/Robot",
     )
 
@@ -52,6 +52,10 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         update_period=0.05,  # Corresponds to 20Hz
         gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
         debug_vis=True,
+        offset=ImuCfg.OffsetCfg(
+            pos=(0.0, 0.0, 1.0), 
+            rot=(1.0, 0.0, 0.0, 0.0)
+        ),
     )
 
     imu_tibia_right = ImuCfg(
@@ -59,6 +63,10 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         update_period=0.05,  # Corresponds to 20Hz
         gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
         debug_vis=True,
+        offset=ImuCfg.OffsetCfg(
+            pos=(0.0, 0.0, 1.0), 
+            rot=(1.0, 0.0, 0.0, 0.0)
+        ),
     )
 
     # lights
@@ -93,12 +101,12 @@ class ActionsCfg:
 
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
-        joint_names=["KNEE_LEFT", "KNEE_RIGHT"],
+        joint_names=["MOTOR_LEFT", "MOTOR_RIGHT"],
         scale=1.0,
         use_default_offset=True,
         clip = {
-            "KNEE_LEFT": (0, 1.74),
-            "KNEE_RIGHT": (0, 1.74)
+            "MOTOR_LEFT": (0, 3.14159265),
+            "MOTOR_RIGHT": (0, 3.14159265)
         }
     )
 
@@ -169,8 +177,23 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
-    track_lin_vel_xy_exp = RewTerm(
-        func=mdp.track_lin_vel_xy_exp, weight=1.0, params={"command_name": "base_velocity", "std": math.sqrt(0.25)}
+    track_lin_vel_xy_base_exp = RewTerm(
+        func=mdp.track_lin_vel_xy_base_exp_ballu, 
+        weight=1.0, 
+        params=
+            {
+                "command_name": "base_velocity", 
+                "std": math.sqrt(0.1)
+            }
+    )
+    track_lin_vel_xy_world_exp = RewTerm(
+        func=mdp.track_lin_vel_xy_world_exp_ballu, 
+        weight=1.0, 
+        params=
+            {
+                "command_name": "base_velocity", 
+                "std": math.sqrt(0.1)
+            }
     )
 
 
@@ -214,3 +237,4 @@ class BALLU_TibiaIMU_EnvCfg(ManagerBasedRLEnvCfg):
         self.sim.dt = 1 / 200.0
         self.sim.render_interval = self.decimation
         self.sim.disable_contact_processing = True
+        self.sim.physx.solver_type = 1 # TGS
