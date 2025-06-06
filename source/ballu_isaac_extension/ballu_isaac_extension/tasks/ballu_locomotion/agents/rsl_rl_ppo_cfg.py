@@ -1,11 +1,11 @@
-from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg
+from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg, RslRlSymmetryCfg
 from isaaclab.utils import configclass
 
 @configclass
 class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
-    num_steps_per_env = 21 # Number of steps per environment before a policy update
-    max_iterations = 1500 # Maximum number of policy upd iterations during training
-    save_interval = 500
+    num_steps_per_env = 25 # Horizon: Number of steps per environment before a policy update
+    max_iterations = 1500
+    save_interval = 100
     experiment_name = "ballu_locomotion"
     empirical_normalization = False  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically

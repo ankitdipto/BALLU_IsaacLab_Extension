@@ -106,7 +106,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # If common_folder is provided, use it instead of timestamp
         if agent_cfg.run_name:
             # Include run_name if provided
-            log_dir = os.path.join(log_root_path, args_cli.common_folder, f"seed_{agent_cfg.seed}_{agent_cfg.run_name}")
+            log_dir = os.path.join(log_root_path, args_cli.common_folder, f"{agent_cfg.run_name}")
         else:
             # Just use seed if no run_name
             log_dir = os.path.join(log_root_path, args_cli.common_folder, f"seed_{agent_cfg.seed}")
@@ -124,11 +124,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # Set the world frame reward to 1.0
         env_cfg.rewards.track_lin_vel_xy_world_exp.weight = 1.0
 
-    else:
-        # Zero out the world frame reward
-        env_cfg.rewards.track_lin_vel_xy_world_exp.weight = 0.0
-        # Set the base frame reward to 1.0
-        env_cfg.rewards.track_lin_vel_xy_base_exp.weight = 1.0
+    # else:
+    #     # Zero out the world frame reward
+    #     env_cfg.rewards.track_lin_vel_xy_world_exp.weight = 0.0
+    #     # Set the base frame reward to 1.0
+    #     env_cfg.rewards.track_lin_vel_xy_base_exp.weight = 1.0
 
     if args_cli.reward_std is not None:
         raise ValueError("Reward standard deviation is not supported for this task.")

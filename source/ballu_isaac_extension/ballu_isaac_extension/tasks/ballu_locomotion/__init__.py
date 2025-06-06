@@ -6,9 +6,9 @@ import gymnasium as gym
 
 from . import agents
 
-# Register the BALLU environment
+# Register the BALLU environments
 gym.register(
-    id="Isaac-Vel-BALLU-real-priv",
+    id="Isc-Vel-BALLU-encoder",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={

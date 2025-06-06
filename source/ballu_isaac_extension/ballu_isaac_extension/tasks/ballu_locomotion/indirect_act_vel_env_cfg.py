@@ -14,7 +14,9 @@ from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.scene import InteractiveSceneCfg
+from isaaclab.sensors import ContactSensorCfg, ImuCfg
 from isaaclab.utils import configclass
 
 import ballu_isaac_extension.tasks.ballu_locomotion.mdp as mdp
@@ -37,7 +39,16 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     # ground plane
     ground = AssetBaseCfg(
         prim_path="/World/ground",
-        spawn=sim_utils.GroundPlaneCfg(size=(100.0, 100.0)),
+        spawn=sim_utils.GroundPlaneCfg(
+            size=(100.0, 100.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                static_friction=1.0,  # Default: 0.5
+                dynamic_friction=1.0,  # Default: 0.5
+                restitution=1.0,      # Default: 0.0
+                friction_combine_mode="multiply",  # Default: "average"
+                restitution_combine_mode="multiply",  # Default: "average"
+            ),
+        ),
     )
 
     # cartpole
@@ -48,6 +59,41 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         prim_path="/World/DomeLight",
         spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=2000.0),
     )
+
+    # contact sensors at feet
+    #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
+    #                                  history_length=3, 
+    #                                  track_air_time=True)
+    
+    # IMU sensors on tibias
+    # imu_tibia_left = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    # )
+    
+    # imu_tibia_right = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    # )
+
+    # IMU sensors on femurs
+    # imu_femur_left = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/FEMUR_LEFT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    # )
+
+    # imu_femur_right = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/FEMUR_RIGHT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    # )
 
 @configclass
 class ConstantVelCommandCfg:
@@ -61,7 +107,7 @@ class ConstantVelCommandCfg:
         heading_command=False,  # Not using heading commands
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.4, 0.4),  # Constant 0.2 m/s along +x
+            lin_vel_x=(0.3, 0.3),  # Constant 0.3 m/s along +x
             lin_vel_y=(0.0, 0.0),  # No y-velocity
             ang_vel_z=(0.0, 0.0),  # No angular velocity
         ),
@@ -74,12 +120,12 @@ class ActionsCfg:
     joint_pos = mdp.JointPositionActionCfg(
         asset_name="robot",
         joint_names=["MOTOR_LEFT", "MOTOR_RIGHT"], # Target motor joints
-        scale=1.0, #0.5,
-        use_default_offset=True,
-        clip = {
-            "MOTOR_LEFT": (0, 3.14159265), # Motor limits 0 to pi
-            "MOTOR_RIGHT": (0, 3.14159265)
-        }
+        scale=3.14159265, #1.0, #0.5,
+        use_default_offset=False,
+        # clip = {
+        #     "MOTOR_LEFT": (0, 3.14159265), # Motor limits 0 to pi
+        #     "MOTOR_RIGHT": (0, 3.14159265)
+        # }
     )
 
 
@@ -94,6 +140,32 @@ class ObservationsCfg:
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
         joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel)
+
+        #base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        #base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
+        #actions = ObsTerm(func=mdp.last_action)
+
+        # IMU sensor readings on tibias
+        #left_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+        #left_tibia_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+        #left_tibia_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+
+        #right_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+        #right_tibia_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+        #right_tibia_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+
+        # IMU sensor readings on femurs
+        # left_femur_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_femur_left")})
+        # left_femur_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_femur_left")})
+        # left_femur_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_femur_left")})
+
+        # right_femur_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_femur_right")})
+        # right_femur_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_femur_right")})
+        # right_femur_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_femur_right")})
+        
+        # Contact sensor readings
+        #feet_air_time = ObsTerm(func=mdp.feet_air_time, params={"sensor_cfg": SceneEntityCfg("contact_forces")})
+        #feet_contact_time = ObsTerm(func=mdp.feet_contact_time, params={"sensor_cfg": SceneEntityCfg("contact_forces")})
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -117,25 +189,119 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    # Reward to encourage tracking the command direction
+    forward_vel_base = RewTerm(
+        func=mdp.forward_velocity,
+        weight=0.0,
+    )
+
+    # Rewards to encourage tracking the exact command velocity
     track_lin_vel_xy_base_exp = RewTerm(
         func=mdp.track_lin_vel_xy_base_exp_ballu, 
         weight=1.0, 
         params=
             {
                 "command_name": "base_velocity", 
-                "std": math.sqrt(0.1)
+                "std": math.sqrt(0.20)
             }
     )
     track_lin_vel_xy_world_exp = RewTerm(
         func=mdp.track_lin_vel_xy_world_exp_ballu, 
-        weight=1.0, 
+        weight=0.0, #1.0, 
         params=
             {
                 "command_name": "base_velocity", 
-                "std": math.sqrt(0.1)
+                "std": math.sqrt(0.25)
             }
     )
 
+    # Penalty to enforce joint actions are within bounds
+    # joint_torques_out_of_bounds = RewTerm(
+    #     func=mdp.joint_torques_out_of_bounds,
+    #     weight=-1.0,
+    #     params=
+    #         {
+    #             "thresh_min": 0.0,
+    #             "thresh_max": 3.14
+    #         }
+    # )
+
+    # Penalty for yaw and linear velocity along z axis
+    # ang_vel_z_l2 = RewTerm(func=mdp.ang_vel_z_l2, weight=-0.05)
+    # lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.05)
+
+    # Penalties to enforce action smoothness
+    # action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.001)
+    # dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-9)
+
+    # Penalties to enforce joint torque limits
+    #dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-5.0e-6)
+
+    # Penalties to penalize feet sliding
+    #feet_slide = RewTerm(func=mdp.feet_slide, weight=-0.01, 
+    #                     params={"sensor_cfg": SceneEntityCfg("contact_forces", 
+    #                                                          body_names="TIBIA_(LEFT|RIGHT)")})
+
+    # Reward to encourage long feet air time
+    # feet_air_time = RewTerm(
+    #     func=mdp.feet_air_time_positive_biped,
+    #     weight=2.5,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names="TIBIA_(LEFT|RIGHT)"),
+    #         "command_name": "base_velocity",
+    #         "threshold": 0.3,
+    #     },
+    # )
+
+@configclass
+class CurriculumsCfg:
+    """Curriculums for the MDP."""
+
+    # vel_command_dir_reward = CurrTerm(
+    #     func=mdp.scale_reward_weight,
+    #     params={
+    #         "term_name": "vel_command_dir",
+    #         "final_weight": 1.0,
+    #         "global_start_step": 0,
+    #         "global_stop_step": 1,
+    #     }
+    # )
+    # feet_air_time_reward = CurrTerm(
+    #     func=mdp.scale_reward_weight,
+    #     params={
+    #         "term_name": "feet_air_time",
+    #         "final_weight": 2.5,
+    #         "global_start_step": 0,
+    #         "global_stop_step": 1,
+    #     }
+    # )
+    # action_rate_l2_penalty = CurrTerm(
+    #     func=mdp.scale_reward_weight,
+    #     params={
+    #         "term_name": "action_rate_l2",
+    #         "final_weight": -0.01,
+    #         "global_start_step": 4_000_000,
+    #         "global_stop_step": 4_000_002,
+    #     }
+    # )
+    # dof_acc_l2_penalty = CurrTerm(
+    #     func=mdp.scale_reward_weight,
+    #     params={
+    #         "term_name": "dof_acc_l2",
+    #         "final_weight": -2.5e-7,
+    #         "global_start_step": 8_000_000,
+    #         "global_stop_step": 8_000_001,
+    #     }
+    # )
+    # vel_tracking_reward = CurrTerm(
+    #     func=mdp.scale_reward_weight,
+    #     params={
+    #         "term_name": "track_lin_vel_xy_base_exp",
+    #         "final_weight": 1.0,
+    #         "global_start_step": 0,
+    #         "global_stop_step": 1,
+    #     }
+    # )
 
 @configclass
 class TerminationsCfg:
@@ -162,6 +328,7 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
     # MDP settings
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
+    curriculums: CurriculumsCfg = CurriculumsCfg()
 
     # Post initialization
     def __post_init__(self) -> None:
@@ -170,7 +337,8 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (0, 7, 3.0)
+        self.viewer.eye = (0, 5, 3.0)
+        self.viewer.look_at = (0, 0, 2.4)
         #self.viewer.resolution = (1280, 720)
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
@@ -178,3 +346,5 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.sim.disable_contact_processing = True
         #self.sim.physx.solver_type = 0 # Projected Gauss-Seidel
         self.sim.physx.solver_type = 1 # Truncated Gauss-Seidel
+        self.sim.physx.min_position_iteration_count = 1
+        self.sim.physx.min_velocity_iteration_count = 1

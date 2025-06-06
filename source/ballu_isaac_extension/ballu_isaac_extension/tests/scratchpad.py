@@ -40,6 +40,8 @@ import torch
 
 from isaaclab.envs import ManagerBasedRLEnv
 from ballu_isaac_extension.tasks.ballu_locomotion.indirect_act_vel_env_cfg import BalluIndirectActEnvCfg
+from isaaclab.envs.mdp.events import randomize_rigid_body_mass
+from isaaclab.managers import SceneEntityCfg
 
 
 def get_periodic_action(step_count, period=200, num_envs=1):
@@ -51,14 +53,27 @@ def get_periodic_action(step_count, period=200, num_envs=1):
     #    action_motor_left = 0.0
     #    action_motor_right = 0.0
     #else:
-    action_motor_left = 0.5 * math.pi * math.sin(2 * math.pi * phase) + (math.pi/2)
-    action_motor_right = 0.5 * math.pi * math.cos(2 * math.pi * phase) + (math.pi/2)
+    dt_sim = 1 / 200.0
+    control_time = step_count * dt_sim
+    action_motor_left = 0.5 * math.sin(2 * math.pi * control_time) + 0.5
+    action_motor_right = 0.5 * math.cos(2 * math.pi * control_time) + 0.5
     
     # Create tensor with shape (num_envs, 2)
     return torch.tensor(
         [[action_motor_left, action_motor_right] for _ in range(num_envs)],
         device="cuda:0"
     )
+
+def stepper(step_count, period=200, num_envs=1):
+    """
+    Stepper controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
+    if step_count % period < period / 2:
+        actions[:, 1] = 1.0
+    else:
+        actions[:, 0] = 1.0
+    return actions
 
 def bang_bang_control(step_count, num_envs=1):
     """
@@ -69,9 +84,113 @@ def bang_bang_control(step_count, num_envs=1):
         torch.Tensor: Control actions (num_envs, num_joints)
     """
     min_action = 0.0
-    max_action = math.pi
+    max_action = 1.0
+    #actions = torch.zeros((num_envs, 2), device="cuda:0")
     actions = torch.full((num_envs, 2), max_action, device="cuda:0") if (step_count % 2 == 0) else torch.full((num_envs, 2), min_action, device="cuda:0")
     return actions
+
+def left_leg_0_right_leg_1(num_envs=1):
+    """
+    Left leg 0, right leg 1 controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
+    actions[:, 1] = 1.0
+    return actions
+
+def left_leg_1_right_leg_0(num_envs=1):
+    """
+    Left leg 1, right leg 0 controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
+    actions[:, 0] = 1.0
+    return actions
+
+def both_legs_0(num_envs=1):
+    """
+    Both legs 0 controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
+    return actions
+
+def both_legs_1(num_envs=1):
+    """
+    Both legs 1 controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), 1.0, device="cuda:0")
+    return actions
+
+def override_link_masses_with_randomizer(env, link_name, mass_range, operation="abs"):
+    """
+    Override mass of a specific link using Isaac Lab's built-in randomizer.
+    
+    Args:
+        env: The Isaac Lab environment
+        link_name: Name of the link/body to modify
+        mass_range: Tuple (min_mass, max_mass) or fixed value
+        operation: "abs" to set absolute value, "scale" to multiply, "add" to add
+    """
+    # Create scene entity config for the specific robot
+    asset_cfg = SceneEntityCfg("robot", body_names=[link_name])
+    
+    # Get all environment indices
+    env_ids = torch.arange(env.num_envs, device=env.device)
+    
+    # Use Isaac Lab's mass randomization function
+    if isinstance(mass_range, (int, float)):
+        mass_range = (mass_range, mass_range)  # Convert single value to range
+    
+    randomize_rigid_body_mass(
+        env=env,
+        env_ids=env_ids,
+        asset_cfg=asset_cfg,
+        mass_distribution_params=mass_range,
+        operation=operation,
+        distribution="uniform",
+        recompute_inertia=True
+    )
+    
+    print(f"Set mass of {link_name} using randomizer with range {mass_range}")
+
+def override_link_masses(env, link_masses_dict):
+    """
+    Override masses of specific links in the robot.
+    
+    Args:
+        env: The Isaac Lab environment
+        link_masses_dict: Dictionary mapping link names to new masses
+                         e.g., {"BALLOON": 0.5, "TIBIA_LEFT": 0.02}
+    """
+    robot = env.unwrapped.scene["robot"]
+    
+    # Get current masses (shape: num_envs, num_bodies)
+    current_masses = robot.root_physx_view.get_masses()
+    
+    # Get body names to find indices
+    body_names = robot.body_names
+    print(f"Available body names: {body_names}")
+    
+    # Create a copy of current masses to modify
+    new_masses = current_masses.clone()
+    
+    # Override specific link masses
+    for link_name, new_mass in link_masses_dict.items():
+        if link_name in body_names:
+            body_idx = body_names.index(link_name)
+            # Set new mass for all environments
+            new_masses[:, body_idx] = new_mass
+            print(f"Set mass of {link_name} (body {body_idx}) to {new_mass} kg")
+        else:
+            print(f"Warning: Link '{link_name}' not found in body names")
+    
+    # Apply the new masses to simulation
+    env_indices = torch.arange(robot.num_instances, dtype=torch.int, device=robot.device)
+    robot.root_physx_view.set_masses(new_masses, env_indices)
+    
+    # Verify the changes
+    updated_masses = robot.root_physx_view.get_masses()
+    print("Mass override verification:")
+    for i, body_name in enumerate(body_names):
+        print(f"  {body_name}: {updated_masses[0, i].item():.6f} kg")
 
 def main():
     """Main function."""
@@ -81,16 +200,27 @@ def main():
     
     # setup RL environment
     env = ManagerBasedRLEnv(cfg=env_cfg)
-    # Wrap for recording video
-    # env = gymnasium.wrappers.RecordVideo(env, video_folder=".",
-    #                                     name_prefix='ballu_manual',
-    #                                     step_trigger=lambda step: step == 0,
-    #                                     video_length=68,
-    #                                     disable_logger=True)
+    
+    # Override specific link masses after environment creation
+    
+    # Method 1: Direct mass override for multiple links
+    # link_masses = {
+    #     "BALLOON": 0.5,        # Reduce balloon mass from ~0.159 kg to 0.5 kg
+    #     "TIBIA_LEFT": 0.02,    # Increase tibia mass to 0.02 kg
+    #     "TIBIA_RIGHT": 0.02,   # Increase tibia mass to 0.02 kg
+    #     "PELVIS": 0.05,        # Increase pelvis mass to 0.05 kg
+    # }
+    #override_link_masses(env, link_masses)
+    
+    # Method 2: Using Isaac Lab's randomizer for individual links
+    #override_link_masses_with_randomizer(env, "BALLOON", 1e-9, operation="abs")
+    # override_link_masses_with_randomizer(env, "TIBIA_LEFT", (0.02, 0.025), operation="abs")
+    
     # print environment information
     print(f"Observation space: {env.observation_space}")
     print(f"Action space: {env.action_space}")
     print(f"Max episode length: {env.max_episode_length}")
+    
     # simulate physics
     # Initialize list to store torque data
     torque_history = []
@@ -130,17 +260,21 @@ def main():
             # joint_pos_targets[:, 0] = max_angle_rad
             # joint_pos_targets = max_angle_rad * torch.ones_like(env.action_manager.action)
             # print("[INFO]: Random action: ", joint_pos_targets)
-            actions = get_periodic_action(count, period = 200, num_envs=args_cli.num_envs)
+            #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
+            actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            #actions = both_legs_1(num_envs=args_cli.num_envs)
+            #actions = both_legs_0(num_envs=args_cli.num_envs)
             #actions = torch.zeros_like(env.action_manager.action)
-            #actions = bang_bang_control(count, num_envs=args_cli.num_envs)
+            #actions = bang_bang_control(count, period=40, num_envs=args_cli.num_envs)
             obs, rew, terminated, truncated, info = env.step(actions)
             
             robots = env.unwrapped.scene["robot"]
             knee_indices = robots.actuators["knee_effort_actuators"].joint_indices
             torques_applied_on_knees = robots.data.applied_torque[:, knee_indices]
-            print("Torques applied on knees: ", torques_applied_on_knees)
+            #print("Torques applied on knees at step: ", count, " are: ", torques_applied_on_knees)
             # Store torque data
-            torque_history.append(torques_applied_on_knees.cpu().numpy())
+            #torque_history.append(torques_applied_on_knees.cpu().numpy())
             
             count += 1
             #if count == 600:

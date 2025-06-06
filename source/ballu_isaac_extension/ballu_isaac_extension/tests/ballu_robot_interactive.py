@@ -27,7 +27,7 @@ from isaaclab.sim import SimulationContext
 from isaaclab.utils import configclass
 from isaaclab.sensors import FrameTransformerCfg
 
-from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_CFG
+from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_REAL_CFG
 
 @configclass
 class BALLUSceneCfg(InteractiveSceneCfg):
@@ -42,7 +42,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     )
 
     # articulation
-    ballu: ArticulationCfg = BALLU_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    ballu: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     robot_transforms = FrameTransformerCfg(
         prim_path="{ENV_REGEX_NS}/Robot/PELVIS",
@@ -54,10 +54,10 @@ def run_simulator(sim: sim_utils.SimulationContext, scene: InteractiveScene):
     """Runs the simulation loop."""
 
     BALLOON_BUOYANCY_MASS = 0.25 #0.202 * 6.0
-    BALLOON_DRAG_COEFFICIENT = 0.4
+    BALLOON_DRAG_COEFFICIENT = 0.0
     BALLOON_BUOYANCY_FORCE = torch.tensor([[0.0, 0.0, 9.81 * BALLOON_BUOYANCY_MASS]],
                                           device=sim.device)
-    PERTURB_ON_BALLOON = torch.tensor([[0.5, 0.0, 0.0]],
+    PERTURB_ON_BALLOON = torch.tensor([[0.1, 0.0, 0.0]],
                                    device=sim.device)
     # Define origins
     origin = torch.tensor([
