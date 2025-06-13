@@ -41,23 +41,23 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(
             size=(100.0, 100.0),
-            physics_material=sim_utils.RigidBodyMaterialCfg(
-                static_friction=1.0,  # Default: 0.5
-                dynamic_friction=1.0,  # Default: 0.5
-                restitution=1.0,      # Default: 0.0
-                friction_combine_mode="multiply",  # Default: "average"
-                restitution_combine_mode="multiply",  # Default: "average"
-            ),
+            # physics_material=sim_utils.RigidBodyMaterialCfg(
+            #     static_friction=0.5,  # Default: 0.5
+            #     dynamic_friction=0.5,  # Default: 0.5
+            #     restitution=0.0,      # Default: 0.0
+            #     friction_combine_mode="multiply",  # Default: "average"
+            #     restitution_combine_mode="multiply",  # Default: "average"
+            # ),
         ),
     )
 
-    # cartpole
+    # BALLU
     robot: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
-        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=2000.0),
+        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
     )
 
     # contact sensors at feet
@@ -138,8 +138,8 @@ class ObservationsCfg:
         """Observations for policy group."""
 
         velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
-        joint_pos_rel = ObsTerm(func=mdp.joint_pos_rel)
-        joint_vel_rel = ObsTerm(func=mdp.joint_vel_rel)
+        joint_pos = ObsTerm(func=mdp.joint_pos)
+        joint_vel = ObsTerm(func=mdp.joint_vel)
 
         #base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
@@ -335,10 +335,10 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         """Post initialization."""
         # general settings
         self.decimation = 10 #8
-        self.episode_length_s = 20
+        self.episode_length_s = 60
         # viewer settings
-        self.viewer.eye = (0, 5, 3.0)
-        self.viewer.look_at = (0, 0, 2.4)
+        self.viewer.eye = (2, 5, 3)
+        self.viewer.lookat = (2, 0, 0.3)
         #self.viewer.resolution = (1280, 720)
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0

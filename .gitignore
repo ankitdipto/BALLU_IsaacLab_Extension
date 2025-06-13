@@ -37,3 +37,4 @@ _build
 .lastformat
 
 **/*.csv
+**/videos*/*

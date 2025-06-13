@@ -37,6 +37,7 @@ simulation_app = app_launcher.app
 """Rest everything follows."""
 
 import torch
+import gymnasium as gym
 
 from isaaclab.envs import ManagerBasedRLEnv
 from ballu_isaac_extension.tasks.ballu_locomotion.indirect_act_vel_env_cfg import BalluIndirectActEnvCfg
