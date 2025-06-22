@@ -1,47 +1,47 @@
 # Exp 0-2: BALLU Real privileged in World Frame
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
-                            --run_name "real_priv_motor-eff=1_seed_0" \
-                            --max_iterations 1500 \
-                            --seed 0 \
-                            --world \
-                            --headless
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
+#                             --run_name "real_priv_motor-eff=1_seed_0" \
+#                             --max_iterations 1500 \
+#                             --seed 0 \
+#                             --world \
+#                             --headless
 
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
-                            --run_name "real_priv_motor-eff=1_seed_1" \
-                            --max_iterations 1500 \
-                            --seed 3 \
-                            --world \
-                            --headless
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
+#                             --run_name "real_priv_motor-eff=1_seed_1" \
+#                             --max_iterations 1500 \
+#                             --seed 3 \
+#                             --world \
+#                             --headless
 
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
-                            --run_name "real_priv_motor-eff=1_seed_2" \
-                            --max_iterations 1500 \
-                            --seed 4 \
-                            --world \
-                            --headless
-############# REAL PRIVILEGED #############
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
+#                             --run_name "real_priv_motor-eff=1_seed_2" \
+#                             --max_iterations 1500 \
+#                             --seed 4 \
+#                             --world \
+#                             --headless
+# ############# REAL PRIVILEGED #############
 
-# Exp 3-5: BALLU Real IMU Tibia in World Frame
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
-                            --run_name "real_imu_tibia_motor-eff=1_seed_0" \
-                            --max_iterations 1500 \
-                            --seed 0 \
-                            --world \
-                            --headless
+# # Exp 3-5: BALLU Real IMU Tibia in World Frame
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
+#                             --run_name "real_imu_tibia_motor-eff=1_seed_0" \
+#                             --max_iterations 1500 \
+#                             --seed 0 \
+#                             --world \
+#                             --headless
 
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
-                            --run_name "real_imu_tibia_motor-eff=1_seed_1" \
-                            --max_iterations 1500 \
-                            --seed 1 \
-                            --world \
-                            --headless
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
+#                             --run_name "real_imu_tibia_motor-eff=1_seed_1" \
+#                             --max_iterations 1500 \
+#                             --seed 1 \
+#                             --world \
+#                             --headless
 
-python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
-                            --run_name "real_imu_tibia_motor-eff=1_seed_2" \
-                            --max_iterations 1500 \
-                            --seed 2 \
-                            --world \
-                            --headless
+# python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-imu-tibia --num_envs 4096 \
+#                             --run_name "real_imu_tibia_motor-eff=1_seed_2" \
+#                             --max_iterations 1500 \
+#                             --seed 2 \
+#                             --world \
+#                             --headless
 ################ REAL IMU Tibia ################
 
 

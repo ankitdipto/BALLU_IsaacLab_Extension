@@ -107,7 +107,7 @@ class ConstantVelCommandCfg:
         heading_command=False,  # Not using heading commands
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.3, 0.3),  # Constant 0.3 m/s along +x
+            lin_vel_x=(0.1927, 0.1927),  # Constant 0.1927 m/s along +x
             lin_vel_y=(0.0, 0.0),  # No y-velocity
             ang_vel_z=(0.0, 0.0),  # No angular velocity
         ),
@@ -122,10 +122,10 @@ class ActionsCfg:
         joint_names=["MOTOR_LEFT", "MOTOR_RIGHT"], # Target motor joints
         scale=3.14159265, #1.0, #0.5,
         use_default_offset=False,
-        # clip = {
-        #     "MOTOR_LEFT": (0, 3.14159265), # Motor limits 0 to pi
-        #     "MOTOR_RIGHT": (0, 3.14159265)
-        # }
+        clip = {
+            "MOTOR_LEFT": (0.0, 3.14159265), # Motor limits 0 to pi
+            "MOTOR_RIGHT": (0.0, 3.14159265)
+        } # TODO: Consider keeping or removing this
     )
 
 
@@ -189,6 +189,13 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    # Reward to encourage tracking the command velocity
+    track_lin_vel_xy_base_l2 = RewTerm(
+        func=mdp.track_lin_vel_xy_base_l2,
+        weight=0.0,
+        params={"command_name": "base_velocity"}
+    )
+
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity,
@@ -202,7 +209,7 @@ class RewardsCfg:
         params=
             {
                 "command_name": "base_velocity", 
-                "std": math.sqrt(0.20)
+                "std": 0.2
             }
     )
     track_lin_vel_xy_world_exp = RewTerm(
@@ -335,7 +342,7 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         """Post initialization."""
         # general settings
         self.decimation = 10 #8
-        self.episode_length_s = 60
+        self.episode_length_s = 20
         # viewer settings
         self.viewer.eye = (2, 5, 3)
         self.viewer.lookat = (2, 0, 0.3)

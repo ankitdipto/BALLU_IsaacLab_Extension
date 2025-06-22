@@ -39,6 +39,7 @@ simulation_app = app_launcher.app
 import gymnasium as gym
 import os
 import torch
+import pandas as pd
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -129,6 +130,7 @@ def main():
     left_foot_pos_history = []
     right_foot_pos_history = []
     base_vel_history = []
+    actions_history = []
     #all_rewards = []
 
     # Get robots_data and tibia indices once before simulation loop
@@ -143,6 +145,7 @@ def main():
     # Acquire DebugDraw interface
     # debug_draw_instance = debug_draw.acquire_debug_draw_interface()
 
+    cum_rewards = 0
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -150,16 +153,17 @@ def main():
             # agent stepping
             actions = policy(obs)
             # env stepping
-            obs, _, _, _ = env.step(actions)
+            obs, rew, _, _ = env.step(actions)
             # Store rewards for plotting
             #all_rewards.append(rewards.mean().item())  # Store the mean reward across environments
             timestep += 1
+            cum_rewards += rew
             # Extract robot's joint positions and joint velocities
             robots_data = env.unwrapped.scene["robot"].data
             joint_pos = robots_data.joint_pos.clone().detach().cpu()
             joint_vel = robots_data.joint_vel.clone().detach().cpu()
             root_com_xyz = robots_data.root_com_state_w.detach().cpu()[..., :3]
-            body_states = robots_data.body_link_state_w.clone().detach().cpu()
+            # body_states = robots_data.body_link_state_w.clone().detach().cpu()
             base_vel = robots_data.root_lin_vel_b.clone().detach().cpu()
             # Print body names once for debugging
             if timestep == 1:
@@ -210,10 +214,14 @@ def main():
             joint_vel_history.append(joint_vel)
             root_com_xyz_history.append(root_com_xyz)
             base_vel_history.append(base_vel)
+            actions_history.append(actions)
         if args_cli.video:
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
+
+        if timestep == 400: # TODO: Remove this
+            break
 
     # close the simulator (Very very important)
     env.close()
@@ -223,14 +231,48 @@ def main():
     joint_vel_hist_tch = torch.stack(joint_vel_history)
     root_com_xyz_hist_tch = torch.stack(root_com_xyz_history)
     base_vel_hist_tch = torch.stack(base_vel_history)
-    
+    actions_hist_tch = torch.stack(actions_history)
     # Generate plots
     plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
     plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
     plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)
     plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
-
+    
+    # Save data to CSV file for env_idx=0
+    env_idx = 0
+    
+    # Extract data for env_idx=0
+    actions_data = actions_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 2)
+    joint_pos_data = joint_pos_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 7)
+    root_com_data = root_com_xyz_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 3)
+    
+    # Create DataFrame with specified headers
+    csv_data = {
+        'ACT_LEFT': actions_data[:, 0],
+        'ACT_RIGHT': actions_data[:, 1],
+        'HIP_LEFT': joint_pos_data[:, 0],
+        'HIP_RIGHT': joint_pos_data[:, 1],
+        'NECK': joint_pos_data[:, 2],
+        'KNEE_LEFT': joint_pos_data[:, 3],
+        'KNEE_RIGHT': joint_pos_data[:, 4],
+        'MOTOR_LEFT': joint_pos_data[:, 5],
+        'MOTOR_RIGHT': joint_pos_data[:, 6],
+        'POS_X': root_com_data[:, 0],
+        'POS_Y': root_com_data[:, 1],
+        'POS_Z': root_com_data[:, 2]
+    }
+    
+    df = pd.DataFrame(csv_data)
+    csv_path = os.path.join(play_folder, "results.csv")
+    df.to_csv(csv_path, index=False)
+    print(f"[INFO] Saved data to CSV file: {csv_path}")
+    
+    base_vel_mean = base_vel_hist_tch.mean(dim=0)
+    base_vel_std = base_vel_hist_tch.std(dim=0)
+    print("base_vel_mean of RL policy: ", base_vel_mean)
+    print("base_vel_std of RL policy: ", base_vel_std)
+    print("cumulative rewards of RL policy: ", cum_rewards)
 
 if __name__ == "__main__":
     # run the main function

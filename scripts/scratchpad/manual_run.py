@@ -89,7 +89,7 @@ def main():
     #buoyancy_offset = [float(x) for x in args_cli.buoyancy_offset]
     print("buoyancy_offset: ", args_cli.buoyancy_offset)
     # setup RL environment
-    env = ManagerBasedRLEnv(cfg=env_cfg, render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
+    env = ManagerBasedRLEnv(cfg=env_cfg) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
     
     # print environment information
     print(f"Observation space: {env.unwrapped.observation_space}")
@@ -103,6 +103,7 @@ def main():
     torque_history = []
     neck_joint_pos_history = []
     root_com_xyz_history = []
+    base_speed_history = []
     count = 0
     cum_rewards = 0
     while simulation_app.is_running():
@@ -116,11 +117,13 @@ def main():
             #actions = torch.zeros_like(env.action_manager.action)
             #actions = bang_bang_control(count, period=40, num_envs=args_cli.num_envs)
             obs, rew, terminated, truncated, info = env.step(actions)
-            env_idx = 0
-            neck_joint_pos = robots.data.joint_pos[env_idx, neck_indices]
-            neck_joint_pos_history.append(neck_joint_pos.item())
-            root_com_xyz = robots.data.root_com_state_w.detach().cpu()[..., :3]
-            root_com_xyz_history.append(root_com_xyz)
+            base_velocity = robots.data.root_lin_vel_b.clone().detach().cpu()
+            base_speed_history.append(base_velocity)
+            #env_idx = 0
+            #neck_joint_pos = robots.data.joint_pos[env_idx, neck_indices]
+            #neck_joint_pos_history.append(neck_joint_pos.item())
+            #root_com_xyz = robots.data.root_com_state_w.detach().cpu()[..., :3]
+            #root_com_xyz_history.append(root_com_xyz)
             #robots = env.unwrapped.scene["robot"]
             #knee_indices = robots.actuators["knee_effort_actuators"].joint_indices
             #torques_applied_on_knees = robots.data.applied_torque[:, knee_indices]
@@ -137,17 +140,23 @@ def main():
 
     # close the environment
     env.close()
-    print(f"Cumulative rewards: {cum_rewards}")
+    print(f"Cumulative rewards: {cum_rewards.item()}")
+    base_speed_history = torch.stack(base_speed_history)
+    
+    base_vel_mean = base_speed_history.mean(dim=0)
+    base_vel_std = base_speed_history.std(dim=0)
+    print("base_vel_mean: ", base_vel_mean)
+    print("base_vel_std: ", base_vel_std)
     #neck_joint_pos_history = np.array(neck_joint_pos_history)
     #print("neck_joint_pos_history: ", neck_joint_pos_history)
-    with open("neck_joint_pos_history.jsonl", "a") as f:
-        f.write(json.dumps({
-            str(args_cli.buoyancy_offset) : neck_joint_pos_history
-        }) + "\n")
+    # with open("neck_joint_pos_history.jsonl", "a") as f:
+    #     f.write(json.dumps({
+    #         str(args_cli.buoyancy_offset) : neck_joint_pos_history
+    #     }) + "\n")
 
-    print("Saved data to neck_joint_pos_history.jsonl")
-    root_com_xyz_history = np.array(root_com_xyz_history)
-    plot_root_com_xy(root_com_xyz_history, 1, "")
+    # print("Saved data to neck_joint_pos_history.jsonl")
+    # root_com_xyz_history = np.array(root_com_xyz_history)
+    # plot_root_com_xy(root_com_xyz_history, 1, "")
     # Convert to numpy array
     #torque_history = np.array(torque_history)  # Shape: (timesteps, num_envs, num_knees)
     

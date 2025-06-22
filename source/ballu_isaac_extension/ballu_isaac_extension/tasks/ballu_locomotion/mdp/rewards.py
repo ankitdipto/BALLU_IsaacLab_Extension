@@ -25,6 +25,18 @@ def forward_velocity(
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     return torch.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
 
+def track_lin_vel_xy_base_l2(
+    env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
+) -> torch.Tensor:
+    """Reward tracking of linear velocity commands (xy axes) using L2 squared kernel."""
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    lin_vel_error = torch.sum(torch.square(env.command_manager.get_command(command_name)[:, :2] - \
+                    asset.data.root_lin_vel_b[:, :2]),
+        dim=1,
+    )
+    return 1 - lin_vel_error
+
 def track_lin_vel_xy_base_exp_ballu(
     env: ManagerBasedRLEnv, std: float, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
 ) -> torch.Tensor:
