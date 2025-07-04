@@ -123,8 +123,8 @@ class ActionsCfg:
         scale=3.14159265, #1.0, #0.5,
         use_default_offset=False,
         clip = {
-            "MOTOR_LEFT": (0.0, 3.14159265), # Motor limits 0 to pi
-            "MOTOR_RIGHT": (0.0, 3.14159265)
+           "MOTOR_LEFT": (0.0, 3.14159265), # Motor limits 0 to pi
+           "MOTOR_RIGHT": (0.0, 3.14159265)
         } # TODO: Consider keeping or removing this
     )
 
@@ -346,7 +346,7 @@ class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         # viewer settings
         self.viewer.eye = (2, 5, 3)
         self.viewer.lookat = (2, 0, 0.3)
-        #self.viewer.resolution = (1280, 720)
+        self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
         self.sim.render_interval = self.decimation

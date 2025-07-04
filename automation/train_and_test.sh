@@ -27,14 +27,14 @@ echo "Using common folder with timestamp: $COMMON_FOLDER_WITH_TIMESTAMP"
 
 for SEED in "$@"
 do
-        # Experiment 1
         echo "Training with seed: $SEED"
         python scripts/rsl_rl/train.py --task "$TASK" \
                                        --num_envs 4096 \
                                        --common_folder "$COMMON_FOLDER_WITH_TIMESTAMP" \
                                        --seed "$SEED" \
                                        --headless \
-                                       --max_iterations "$MAX_ITERATIONS"
+                                       --max_iterations "$MAX_ITERATIONS" \
+                                       "agent.algorithm.mirror_symmetry_cfg.weight=1e-0"
 
         echo "Testing with seed: $SEED"
         python scripts/rsl_rl/play.py --task "$TASK" \

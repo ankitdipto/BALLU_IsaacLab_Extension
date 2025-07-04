@@ -243,9 +243,9 @@ def main():
     env_idx = 0
     
     # Extract data for env_idx=0
-    actions_data = actions_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 2)
-    joint_pos_data = joint_pos_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 7)
-    root_com_data = root_com_xyz_hist_tch[:, env_idx, :].numpy()  # Shape: (num_timesteps, 3)
+    actions_data = actions_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 2)
+    joint_pos_data = joint_pos_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
+    root_com_data = root_com_xyz_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
     
     # Create DataFrame with specified headers
     csv_data = {
