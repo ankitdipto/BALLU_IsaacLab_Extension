@@ -2,9 +2,10 @@
 
 [![IsaacSim](https://img.shields.io/badge/IsaacSim-4.5.0-silver.svg)](https://docs.isaacsim.omniverse.nvidia.com/latest/index.html)
 [![IsaacLab (ankitdipto fork)](https://img.shields.io/badge/IsaacLab%20(fork)-ankitdipto%2FIsaacLab-blue)](https://github.com/ankitdipto/IsaacLab)
+[![RSL_RL (ankitdipto fork)](https://img.shields.io/badge/RSL_RL%20(fork)-ankitdipto%2Frsl_rl-blue)](https://github.com/ankitdipto/rsl_rl)
 [![Python](https://img.shields.io/badge/python-3.10-blue.svg)](https://docs.python.org/3/whatsnew/3.10.html)
 
-This repository contains an Isaac Lab extension for the BALLU (Buoyancy-Assisted Legged Locomotion Unit) robot. The goal of this research project is to find good morpholgies of the robot that results in better locomotion. The morphology search is focused on sensor exploration.
+This repository contains an Isaac Lab extension for the BALLU (Buoyancy-Assisted Legged Locomotion Unit) robot. The goal of this research project is to optimize the morphology of BALLU to achieve stable and dynamic locomotion.
 
 ## Overview
 
@@ -17,24 +18,32 @@ This extension allows for:
 
 A conda environment (python 3.10) with the following packages installed:
 - NVIDIA Isaac Sim (tested with version 4.5.0)
-- NVIDIA IsaacLab (**MUST use the forked repo:** [https://github.com/ankitdipto/IsaacLab](https://github.com/ankitdipto/IsaacLab), tested with version 2.0.0)
-    - **Do NOT use the original NVIDIA IsaacLab repository. This project requires features and fixes only present in the forked repository.**
+- NVIDIA IsaacLab (**MUST use the forked repo:** [https://github.com/ankitdipto/IsaacLab](https://github.com/ankitdipto/IsaacLab), **ballu_v0 branch**, tested with version 2.0.0)
+    - **Do NOT use the original NVIDIA IsaacLab repository. This project requires features and fixes only present in the forked repository and the `ballu_v0` branch.**
+- RSL_RL (**MUST use the forked repo:** [https://github.com/ankitdipto/rsl_rl](https://github.com/ankitdipto/rsl_rl), **develop branch**)
+    - **Do NOT use the original RSL_RL repository. This project requires features and fixes only present in the forked repository and the `develop` branch.**
 
 ## Installation
 
 1.  Clone and install the forked IsaacLab repository (required):
     ```bash
-    git clone https://github.com/ankitdipto/IsaacLab.git
+    git clone -b ballu_v0 https://github.com/ankitdipto/IsaacLab.git
     cd IsaacLab
-    # Follow the installation instructions in the forked repo's README (use the correct branch if specified)
+    # Follow the installation instructions in the forked repo's README.md
     ```
-2.  Ensure your Conda environment containing all required packages (including the forked IsaacLab) is activated.
-2.  Clone this repository:
+2.  Clone and install the forked RSL_RL repository (required):
+    ```bash
+    git clone -b develop https://github.com/ankitdipto/rsl_rl.git
+    cd rsl_rl
+    pip install -e .
+    ```
+3.  Ensure your Conda environment containing all required packages (including the forked IsaacLab and RSL_RL) is activated.
+4.  Clone this repository:
     ```bash
     git clone <repository_url> BALLU_IsaacLab_Extension
     cd BALLU_IsaacLab_Extension
     ```
-3.  Install this extension package in editable mode:
+5.  Install this extension package in editable mode:
     ```bash
     python -m pip install -e source/ballu_isaac_extension
     ```
