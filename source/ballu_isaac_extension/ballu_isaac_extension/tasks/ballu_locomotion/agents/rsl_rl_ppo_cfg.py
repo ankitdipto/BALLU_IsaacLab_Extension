@@ -6,7 +6,7 @@ class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 100
-    experiment_name = "lab_6.17.2025"
+    experiment_name = "lab_7.15.2025"
     empirical_normalization = False  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
@@ -35,7 +35,7 @@ class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         # Mirror Symmetry Loss Configuration (Yu et al. approach)
         mirror_symmetry_cfg=RslRlMirrorSymmetryCfg(
             enabled=True,  # Enable mirror symmetry loss
-            weight=4.0,    # Weight for mirror symmetry loss term
+            weight=1.0,    # Weight for mirror symmetry loss term
             
             # Define symmetric joint pairs for observations
             # Observation structure: velocity_commands(2) + joint_pos(7) + joint_vel(7)
