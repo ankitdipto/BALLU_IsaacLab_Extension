@@ -19,9 +19,9 @@ This extension allows for:
 A conda environment (python 3.10) with the following packages installed:
 - NVIDIA Isaac Sim (tested with version 4.5.0)
 - NVIDIA IsaacLab (**MUST use the forked repo:** [https://github.com/ankitdipto/IsaacLab](https://github.com/ankitdipto/IsaacLab), **ballu_v0 branch**, tested with version 2.0.0)
-    - **Do NOT use the original NVIDIA IsaacLab repository. This project requires features and fixes only present in the forked repository and the `ballu_v0` branch.**
+    - **Do NOT use the original NVIDIA IsaacLab repository. This project requires features only present in the forked repository and the `ballu_v0` branch.**
 - RSL_RL (**MUST use the forked repo:** [https://github.com/ankitdipto/rsl_rl](https://github.com/ankitdipto/rsl_rl), **develop branch**)
-    - **Do NOT use the original RSL_RL repository. This project requires features and fixes only present in the forked repository and the `develop` branch.**
+    - **Do NOT use the original RSL_RL repository. This project requires features only present in the forked repository and the `develop` branch.**
 
 ## Installation
 
