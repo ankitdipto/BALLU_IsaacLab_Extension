@@ -246,7 +246,7 @@ def main():
     actions_data = actions_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 2)
     joint_pos_data = joint_pos_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
     root_com_data = root_com_xyz_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
-    
+    base_vel_data = base_vel_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
     # Create DataFrame with specified headers
     csv_data = {
         'ACT_LEFT': actions_data[:, 0],
@@ -260,7 +260,10 @@ def main():
         'MOTOR_RIGHT': joint_pos_data[:, 6],
         'POS_X': root_com_data[:, 0],
         'POS_Y': root_com_data[:, 1],
-        'POS_Z': root_com_data[:, 2]
+        'POS_Z': root_com_data[:, 2],
+        'VEL_X': base_vel_data[:, 0],
+        'VEL_Y': base_vel_data[:, 1],
+        'VEL_Z': base_vel_data[:, 2]
     }
     
     df = pd.DataFrame(csv_data)
