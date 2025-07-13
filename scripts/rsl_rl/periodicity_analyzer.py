@@ -516,16 +516,16 @@ def main():
         description="Analyze periodicity in KNEE_LEFT and KNEE_RIGHT time-series data"
     )
     parser.add_argument(
-        "csv_file", 
+        "--csv_file", 
         help="Path to CSV file containing time-series data"
     )
     parser.add_argument(
-        "--output-dir", 
+        "--output_dir", 
         default="./periodicity_analysis_output",
         help="Output directory for plots and results (default: ./periodicity_analysis_output)"
     )
     parser.add_argument(
-        "--sampling-rate", 
+        "--sampling_rate", 
         type=float, 
         default=1.0,
         help="Sampling rate of the data in Hz (default: 1.0)"

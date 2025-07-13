@@ -214,15 +214,15 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python csv_analyzer.py data/results.csv plots/
-  python csv_analyzer.py /path/to/data.csv /path/to/output/
+  python results_analyzer.py --csv_file data/results.csv --output_dir plots/
+  python results_analyzer.py --csv_file /path/to/data.csv --output_dir /path/to/output/
         """
     )
     
-    parser.add_argument('csv_file', 
+    parser.add_argument('--csv_file', 
                        help='Path to the input CSV file')
     
-    parser.add_argument('output_dir', 
+    parser.add_argument('--output_dir', 
                        help='Directory to save the generated plots')
     
     parser.add_argument('--verbose', '-v', 
