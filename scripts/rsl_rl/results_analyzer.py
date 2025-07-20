@@ -191,6 +191,33 @@ def plot_actuator_data(df, output_dir):
     print(f"[INFO] Actuator values plot saved to: {output_path}")
 
 
+def plot_torque_data(df, output_dir, side):
+    """
+    Plot computed and applied torques for a given actuator side ('LEFT' or 'RIGHT').
+    """
+    assert side in ("LEFT", "RIGHT")
+    comp_col = f"COMP_TORQ_{side}_KNEE"
+    appl_col = f"APPLIED_TORQ_{side}_KNEE"
+    if comp_col not in df.columns or appl_col not in df.columns:
+        print(f"[WARN] Columns {comp_col} or {appl_col} not found in data. Skipping {side.lower()} torque plot.")
+        return
+
+    fig, ax = plt.subplots(figsize=(12, 8))
+    time_steps = range(len(df))
+    ax.plot(time_steps, df[comp_col], label=f"Computed Torque {side.title()}", color="#1f77b4", linestyle="-", linewidth=2.0)
+    ax.plot(time_steps, df[appl_col], label=f"Applied Torque {side.title()}", color="#ff7f0e", linestyle="--", linewidth=2.0)
+    ax.set_xlabel('Time Step')
+    ax.set_ylabel('Torque (Nm)')
+    ax.set_title(f"Computed vs Applied Torque ({side.title()} Actuator)")
+    ax.legend(loc='best', frameon=True, fancybox=True, shadow=True)
+    ax.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
+    plt.tight_layout()
+    output_path = os.path.join(output_dir, f"torque_{side.lower()}_plot.png")
+    plt.savefig(output_path, dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"[INFO] {side.title()} actuator torque plot saved to: {output_path}")
+
+
 def print_data_summary(df):
     """Print a summary of the loaded data."""
     print("\n" + "="*50)
@@ -223,7 +250,7 @@ Examples:
                        help='Path to the input CSV file')
     
     parser.add_argument('--output_dir', 
-                       help='Directory to save the generated plots')
+                       help='Directory to save the generated plots (defaults to parent directory of input file)')
     
     parser.add_argument('--verbose', '-v', 
                        action='store_true',
@@ -244,6 +271,12 @@ Examples:
         if args.verbose:
             print_data_summary(df)
         
+        # Set default output directory to parent directory of input file if not specified
+        if args.output_dir is None:
+            args.output_dir = str(Path(args.csv_file).parent)
+            if args.verbose:
+                print(f"Using default output directory: {args.output_dir}")
+        
         # Create output directory if it doesn't exist
         output_dir = Path(args.output_dir)
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -257,6 +290,10 @@ Examples:
         
         print("Generating actuator values plot...")
         plot_actuator_data(df, str(output_dir))
+        # New: Generate torque plots if columns exist
+        print("Generating computed/applied torque plots for actuators...")
+        plot_torque_data(df, str(output_dir), side="LEFT")
+        plot_torque_data(df, str(output_dir), side="RIGHT")
         
         print("\n✓ All plots generated successfully!")
         
