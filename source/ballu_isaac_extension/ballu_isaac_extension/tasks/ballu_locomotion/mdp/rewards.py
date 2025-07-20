@@ -17,13 +17,13 @@ from isaaclab.sim.spawners.spawner_cfg import RigidObjectSpawnerCfg
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
-def forward_velocity(
+def forward_velocity_x(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
     """Reward absolute velocity in the XY plane"""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
-    return torch.norm(asset.data.root_lin_vel_b[:, :2], dim=1)
+    return asset.data.root_lin_vel_b[:, 0]
 
 def track_lin_vel_xy_base_l2(
     env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
