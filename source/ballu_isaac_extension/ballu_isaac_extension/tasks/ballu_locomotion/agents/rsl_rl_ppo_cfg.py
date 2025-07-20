@@ -43,21 +43,21 @@ class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
             # Total obs dim: 2 + 7 + 7 = 16
             symmetric_joint_pairs=[
                 # Joint positions (indices 2-8): velocity_commands(2) + joint_pos(7)
-                (3, 4),   # HIP_LEFT <-> HIP_RIGHT (indices 2+1, 2+2)
-                (5, 6),   # KNEE_LEFT <-> KNEE_RIGHT (indices 2+3, 2+4)  
-                (7, 8),   # MOTOR_LEFT <-> MOTOR_RIGHT (indices 2+5, 2+6)
+                (3-3, 4-3),   # HIP_LEFT <-> HIP_RIGHT (indices 2+1, 2+2)
+                (5-3, 6-3),   # KNEE_LEFT <-> KNEE_RIGHT (indices 2+3, 2+4)  
+                (7-3, 8-3),   # MOTOR_LEFT <-> MOTOR_RIGHT (indices 2+5, 2+6)
                 # Joint velocities (indices 9-15): velocity_commands(2) + joint_pos(7) + joint_vel(7)
-                (10, 11), # HIP_LEFT_vel <-> HIP_RIGHT_vel (indices 9+1, 9+2)
-                (12, 13), # KNEE_LEFT_vel <-> KNEE_RIGHT_vel (indices 9+3, 9+4)
-                (14, 15), # MOTOR_LEFT_vel <-> MOTOR_RIGHT_vel (indices 9+5, 9+6)
+                (10-3, 11-3), # HIP_LEFT_vel <-> HIP_RIGHT_vel (indices 9+1, 9+2)
+                (12-3, 13-3), # KNEE_LEFT_vel <-> KNEE_RIGHT_vel (indices 9+3, 9+4)
+                (14-3, 15-3), # MOTOR_LEFT_vel <-> MOTOR_RIGHT_vel (indices 9+5, 9+6)
             ],
             
             # Define symmetric observation indices (sign flip for lateral components)
             # For velocity commands: lin_vel_y should be flipped for symmetry
-            symmetric_obs_indices=[
-                1,  # lin_vel_y command (index 1 in velocity_commands)
+            #symmetric_obs_indices=[
+            #    1,  # lin_vel_y command (index 1 in velocity_commands)
                 # Note: Add other lateral velocity/angular velocity indices if your observations include them
-            ],
+            #],
             
             # Define symmetric action pairs for motor joints
             # Actions are [MOTOR_LEFT, MOTOR_RIGHT]
