@@ -131,6 +131,8 @@ def main():
     right_foot_pos_history = []
     base_vel_history = []
     actions_history = []
+    comp_torq_history = []
+    applied_torq_history = []
     #all_rewards = []
 
     # Get robots_data and tibia indices once before simulation loop
@@ -146,6 +148,7 @@ def main():
     # debug_draw_instance = debug_draw.acquire_debug_draw_interface()
 
     cum_rewards = 0
+    robot_jnt_names = []
     # simulate environment
     while simulation_app.is_running():
         # run everything in inference mode
@@ -165,10 +168,17 @@ def main():
             root_com_xyz = robots_data.root_com_state_w.detach().cpu()[..., :3]
             # body_states = robots_data.body_link_state_w.clone().detach().cpu()
             base_vel = robots_data.root_lin_vel_b.clone().detach().cpu()
+            comp_torq = robots_data.computed_torque.clone().detach().cpu()
+            applied_torq = robots_data.applied_torque.clone().detach().cpu()
+            # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+            # print("Torques from play.py")
+            # print(f"Computed torque: {comp_torq.cpu().numpy()}")
+            # print(f"Applied torque: {applied_torq.cpu().numpy()}")
+            # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
             # Print body names once for debugging
             if timestep == 1:
                 print("Available body names:", robots_data.body_names)
-
+                robot_jnt_names = robots_data.joint_names
             # Extract tibia positions and calculate foot positions
             # if left_tibia_idx is not None:
             #     left_tibia_pos = body_states[:, left_tibia_idx, :3]
@@ -215,13 +225,15 @@ def main():
             root_com_xyz_history.append(root_com_xyz)
             base_vel_history.append(base_vel)
             actions_history.append(actions)
+            comp_torq_history.append(comp_torq)
+            applied_torq_history.append(applied_torq)
         if args_cli.video:
             # Exit the play loop after recording one video
             if timestep == args_cli.video_length:
                 break
 
-        if timestep == 400: # TODO: Remove this
-            break
+        #if timestep == 400: # TODO: Remove this
+        #    break
 
     # close the simulator (Very very important)
     env.close()
@@ -232,6 +244,8 @@ def main():
     root_com_xyz_hist_tch = torch.stack(root_com_xyz_history)
     base_vel_hist_tch = torch.stack(base_vel_history)
     actions_hist_tch = torch.stack(actions_history)
+    comp_torq_hist_tch = torch.stack(comp_torq_history)
+    applied_torq_hist_tch = torch.stack(applied_torq_history)
     # Generate plots
     plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
@@ -247,6 +261,12 @@ def main():
     joint_pos_data = joint_pos_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
     root_com_data = root_com_xyz_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
     base_vel_data = base_vel_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
+    comp_torq_data = comp_torq_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
+    applied_torq_data = applied_torq_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
+    
+    left_knee_idx = robot_jnt_names.index("KNEE_LEFT")
+    right_knee_idx = robot_jnt_names.index("KNEE_RIGHT")
+
     # Create DataFrame with specified headers
     csv_data = {
         'ACT_LEFT': actions_data[:, 0],
@@ -263,7 +283,11 @@ def main():
         'POS_Z': root_com_data[:, 2],
         'VEL_X': base_vel_data[:, 0],
         'VEL_Y': base_vel_data[:, 1],
-        'VEL_Z': base_vel_data[:, 2]
+        'VEL_Z': base_vel_data[:, 2],
+        'COMP_TORQ_LEFT_KNEE': comp_torq_data[:, left_knee_idx],
+        'COMP_TORQ_RIGHT_KNEE': comp_torq_data[:, right_knee_idx],
+        'APPLIED_TORQ_LEFT_KNEE': applied_torq_data[:, left_knee_idx],
+        'APPLIED_TORQ_RIGHT_KNEE': applied_torq_data[:, right_knee_idx]
     }
     
     df = pd.DataFrame(csv_data)
