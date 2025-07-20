@@ -137,7 +137,8 @@ class ObservationsCfg:
     class PolicyCfg(ObsGroup):
         """Observations for policy group."""
 
-        velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
+        # TODO: Add velocity commands to the observation space for velocity tracking task
+        #velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos)
         joint_vel = ObsTerm(func=mdp.joint_vel)
 
@@ -198,14 +199,14 @@ class RewardsCfg:
 
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
-        func=mdp.forward_velocity,
-        weight=0.0,
+        func=mdp.forward_velocity_x,
+        weight=4.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
     track_lin_vel_xy_base_exp = RewTerm(
         func=mdp.track_lin_vel_xy_base_exp_ballu, 
-        weight=1.0, 
+        weight=0.0, 
         params=
             {
                 "command_name": "base_velocity", 
