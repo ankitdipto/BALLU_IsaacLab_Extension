@@ -85,19 +85,26 @@ def main():
     # create environment configuration
     env_cfg = BalluIndirectActEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
-    
+    #env_cfg.scene.robot.spawn.usd_path = \
+    #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
     #buoyancy_offset = [float(x) for x in args_cli.buoyancy_offset]
     print("buoyancy_offset: ", args_cli.buoyancy_offset)
     # setup RL environment
     env = ManagerBasedRLEnv(cfg=env_cfg) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
     
     # print environment information
+    print(f"\n=== ENVIRONMENT INFO ===")
     print(f"Observation space: {env.unwrapped.observation_space}")
     print(f"Action space: {env.unwrapped.action_space}")
     print(f"Max episode length: {env.unwrapped.max_episode_length}")
     
     robots = env.unwrapped.scene["robot"]
     neck_indices, neck_names = robots.find_joints("NECK")
+    
+    print(f"\n=== ROBOT INFO ===")
+    print(f"Robot body names: {robots.body_names}")
+    print(f"Robot joint names: {robots.joint_names}")
+    
     # simulate physics
     # Initialize list to store torque data
     torque_history = []
@@ -132,8 +139,8 @@ def main():
             #torque_history.append(torques_applied_on_knees.cpu().numpy())
             cum_rewards += rew
             count += 1
-            if count == 400:
-                break
+            # if count == 400:
+            #     break
             # if terminated.any() or truncated.any():
             #     print(f"[INFO]: Environments terminated after {count} steps.")
             #     break
