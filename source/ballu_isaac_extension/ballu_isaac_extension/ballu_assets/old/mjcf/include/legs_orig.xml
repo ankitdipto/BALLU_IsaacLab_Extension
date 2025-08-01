@@ -1,0 +1,61 @@
+<mujoco model="ballu">
+  <body name="FEMUR_LEFT" pos="0 0.08 0">
+    <joint class="hip" name="HIP_LEFT" />
+    <geom class="visual" material="lFemur" mesh="FEMUR_LEFT" />
+    <geom class="collision_femur" material="lFemur" />
+    <inertial mass="0.0078852"
+      pos="1.7146e-08 2.367e-10 -0.23157"
+      quat="1 0 0 -3.51038e-05"
+      diaginertia="4.6139e-05 4.6113e-05 1.3203e-07" />
+
+    <body name="TIBIA_LEFT" pos="0 0 -0.3653">
+      <joint class="knee" name="KNEE_LEFT" />
+      <geom class="visual" material="lTibia" mesh="TIBIA_LEFT" />
+      <geom class="collision_tibia" material="lTibia" /> <!-- <geom class="_lBall" /> -->
+      <inertial mass="0.025017"
+        pos="0.0036348 0.0041554 -0.21893"
+        quat="0.659953 0.000329012 0.00268305 0.751302"
+        diaginertia="2.23759e-05 2.21008e-05 7.27503e-07" />
+
+      <body name="MOTORARM_LEFT" pos="-0.0071429 0.00063 -0.23732">
+        <joint class="ankle" name="ANKLE_LEFT" />
+        <geom class="visual" material="lMotorarm" mesh="MOTORARM_LEFT" />
+        <geom class="collision_motorarm" material="lMotorarm" />
+        <inertial mass="6.5322e-05"
+          pos="0 -0.0006327 0.0016754"
+          quat="0.705718 -0.0442953 0.0442953 0.705718"
+          diaginertia="7.13997e-10 6.5279e-10 1.55833e-10" />
+      </body>
+    </body>
+  </body>
+
+  <body name="FEMUR_RIGHT" pos="0 -0.08 0">
+    <joint class="hip" name="HIP_RIGHT" />
+    <geom class="visual" material="rFemur" mesh="FEMUR_RIGHT" />
+    <geom class="collision_femur" material="rFemur" />
+    <inertial mass="0.0078852"
+      pos="1.7146e-08 2.367e-10 -0.23157"
+      quat="1 0 0 -3.51038e-05"
+      diaginertia="4.6139e-05 4.6113e-05 1.3203e-07" />
+
+    <body name="TIBIA_RIGHT" pos="0 0 -0.3653">
+      <joint class="knee" name="KNEE_RIGHT" />
+      <geom class="visual" material="rTibia" mesh="TIBIA_RIGHT" />
+      <geom class="collision_tibia" material="rTibia" /> <!-- <geom class="_rBall" /> -->
+      <inertial mass="0.025017"
+        pos="0.0038429 -0.0041554 -0.21893"
+        quat="0.751302 0.0026833 0.000329325 0.659953"
+        diaginertia="2.23759e-05 2.21008e-05 7.27503e-07" />
+
+      <body name="MOTORARM_RIGHT" pos="-0.0071429 -0.00063 -0.23732">
+        <joint class="ankle" name="ANKLE_RIGHT" />
+        <geom class="visual" material="rMotorarm" mesh="MOTORARM_RIGHT" />
+        <geom class="collision_motorarm" material="rMotorarm" />
+        <inertial mass="6.5322e-05"
+          pos="0 0.0006327 0.0016754"
+          quat="0.705718 0.0442953 -0.0442953 0.705718"
+          diaginertia="7.13997e-10 6.5279e-10 1.55833e-10" />
+      </body>
+    </body>
+  </body>
+</mujoco>

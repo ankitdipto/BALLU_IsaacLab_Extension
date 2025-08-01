@@ -1,0 +1,81 @@
+<mujoco model="ballu">
+  <!--
+  - add <light> and <geom> under <worldbody>
+  - add <camera> under {BASE BODY LINK}
+  - add joint range
+  - add <actuator>
+  - add <default>
+  - add attributes into <comiler>; coordinate="local", inertiafromgeom="true"
+  - add <option integrator="RK4" timestep="0.01"/>.
+  -->
+
+  <!-- set defaults for units and else -->
+  <compiler angle="radian" meshdir="../meshes/" coordinate="local" /> <!-- inertiafromgeom="true" -->
+  <option integrator="RK4" timestep="0.01" /> <!-- <size njmax="500" nconmax="100" /> -->
+  <default class="main">
+    <!-- <joint armature="1" damping="1" limited="true"/>
+    <geom conaffinity="0" condim="3" density="5.0" friction="1 0.5 0.5" margin="0.01" rgba="0.8 0.6 0.4 1"/> -->
+    <!--    <joint margin="0.5" solreflimit="0.09 0.1" solimplimit="1"/>-->
+    <!--    0.99 0.9999 0.000001-->
+    <joint solimplimit="0.95 0.9999 0.0001"/>
+    <default class="visual">
+      <geom type="mesh" contype="0" conaffinity="0" group="1" />
+    </default>
+    <default class="collision">
+      <geom type="cylinder"/>
+      <default class="collision_femur">
+        <geom size="0.005 0.155" pos="0 0 -0.18" />
+      </default>
+      <default class="collision_tibia">
+        <geom size="0.005 0.135" pos="0 0 -0.15" />
+      </default>
+      <default class="collision_motorarm">
+        <geom size="0.0015 0.005" pos="0 0 0.005" />
+      </default>
+    </default>
+    <default class="_lBall">
+      <geom size="0.005" pos="0 0 -0.285" rgba="1 0.25 0.25 1" />
+    </default>
+    <default class="_rBall">
+      <geom size="0.005" pos="0 0 -0.285" rgba="0.25 0.25 1 1" />
+    </default>
+
+    <default class="hip">
+      <joint type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="-1.57 3.14" /> ref="0.2356"
+    </default>
+    <default class="knee">
+      <joint type="hinge" pos="0 0 0" axis="0 1 0" limited="true" range="0.4712 1.2566" />  ref="-0.4712" 0.7854
+    </default>
+    <default class="ankle">
+      <joint type="hinge" pos="0 0 0" axis="0 -1 0" limited="true" range="0 3.14" />
+    </default>
+
+  </default>
+
+  <asset>
+    <!-- Color macros for body parts -->
+    <material name="pelvis" rgba="0 0.8 0 1" />
+    <material name="lFemur" rgba="0.7 0 0 1" />
+    <material name="lTibia" rgba="1 0.25 0.25 1" />
+    <material name="lMotorarm" rgba="1 1 0 1" />
+    <material name="rFemur" rgba="0 0 0.8 1" />
+    <material name="rTibia" rgba="0.25 0.25 1 1" />
+    <material name="rMotorarm" rgba="1 1 0 1" />
+
+    <!-- Material and texture definitions for environments -->
+    <texture builtin="gradient" height="100" rgb1="1 1 1" rgb2="0 0 0" type="skybox" width="100"/>
+    <texture builtin="flat" height="1278" mark="cross" markrgb="1 1 1" name="texgeom" random="0.01" rgb1="0.8 0.6 0.4" rgb2="0.8 0.6 0.4" type="cube" width="127"/>
+    <texture builtin="checker" height="100" name="texplane" rgb1="0 0 0" rgb2="0.8 0.8 0.8" type="2d" width="100"/>
+    <material name="MatPlane" reflectance="0.5" shininess="1" specular="1" texrepeat="60 60" texture="texgeom"/> <!-- texture="texplane" -->
+    <!-- <material name="geom" texture="texgeom" texuniform="true"/> -->
+
+    <!-- import stl file -->
+    <mesh name="PELVIS" file="PELVIS.STL" />
+    <mesh name="FEMUR_LEFT" file="FEMUR_LEFT.STL" />
+    <mesh name="TIBIA_LEFT" file="TIBIA_LEFT.STL" />
+    <mesh name="MOTORARM_LEFT" file="MOTORARM_LEFT.STL" />
+    <mesh name="FEMUR_RIGHT" file="FEMUR_RIGHT.STL" />
+    <mesh name="TIBIA_RIGHT" file="TIBIA_RIGHT.STL" />
+    <mesh name="MOTORARM_RIGHT" file="MOTORARM_RIGHT.STL" />
+  </asset>
+</mujoco>

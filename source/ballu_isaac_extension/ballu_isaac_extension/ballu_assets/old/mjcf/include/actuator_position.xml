@@ -1,0 +1,15 @@
+<mujoco>
+  <actuator>
+    <!-- Knee Actuation case -->
+<!--    <motor ctrllimited="true" ctrlrange="-1.0 1.0" forcelimited="false" forcerange="0 0" joint="KNEE_LEFT" gear="100"/>-->
+<!--    <motor ctrllimited="true" ctrlrange="-1.0 1.0" forcelimited="false" forcerange="0 0" joint="KNEE_RIGHT" gear="100"/>-->
+<!--    <motor name="knee_left" joint="KNEE_LEFT" gear="2"/>-->
+<!--    <motor name="knee_right" joint="KNEE_RIGHT" gear="2"/>-->
+    <position kp="2" ctrllimited="true" ctrlrange="0.4712 1.2566" joint="KNEE_LEFT" />
+    <position kp="2" ctrllimited="true" ctrlrange="0.4712 1.2566" joint="KNEE_RIGHT" />
+
+    <!-- Ankle Actuation case -->
+    <!-- <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ANKLE_LEFT" gear="150"/> -->
+    <!-- <motor ctrllimited="true" ctrlrange="-1.0 1.0" joint="ANKLE_RIGHT" gear="150"/> -->
+  </actuator>
+</mujoco>

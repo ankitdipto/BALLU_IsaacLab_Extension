@@ -1,0 +1,44 @@
+<mujoco model="ballu">
+  <include file="include/common.xml" />
+
+  <worldbody>
+    <include file="include/world_camera.xml" />
+
+    <body name="BALLOON" pos="0 0 9.6250e-01">
+      <geom class="collision" size="0.2 0.25" pos="0 0 0" />
+      <geom contype="0" conaffinity="0" group="1" type="cylinder" size="0.2 0.25" pos="0 0 0" />
+      <inertial mass="118.8e-3" pos="0 0 0" quat="1 0 0 0" fullinertia="0.002376 0.003663 0.003663 0 0 0" />
+
+      <!-- Root Joint; 3D Motion (free_joint.xml) or 2D Planar Motion "planar_joint.xml" -->
+      <include file="include/planar_joint.xml" />
+
+
+    <body name="PELVIS" pos="0 0 -0.25">
+
+
+
+      <!-- Hinge Joint when balloon is main object and haning there -->
+      <!-- <joint name="NECK" limited="false" pos="0 0 0" axis="0 1 0" /> -->
+      <camera name="track" mode="trackcom" pos="0 -3 0.3" xyaxes="1 0 0 0 0 1" />
+
+      <!-- Body Part Definition Starts -->
+      <geom class="visual" material="pelvis" mesh="PELVIS" />
+      <geom class="collision" material="pelvis" size="0.005 0.1" quat="0.707388 0.706825 0 0" />
+      <inertial mass="31.2e-3" pos="0 0 0" quat="1 0 0 0" fullinertia="0.0000246887633608114 0.00000276868285563646 0.0000247832516992427 -0.0000000237246084649085 0.000000130406315413016 -0.0000000134962843018424" />
+      <!-- <inertial mass="0.016084"
+        pos="-0.00055484 -4.5608e-05 -0.0035406"
+        quat="0.495763 0.498876 -0.500683 0.504637"
+        diaginertia="1.08971e-05 1.02514e-05 8.27542e-07" /> -->
+
+      <include file="include/legs.xml" />
+
+
+
+
+
+    </body>
+    </body>
+  </worldbody>
+
+  <include file="include/actuator_position.xml" />
+</mujoco>

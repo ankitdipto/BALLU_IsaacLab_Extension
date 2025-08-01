@@ -1,0 +1,5 @@
+<mujoco>
+  <joint damping="0" name="root_front"    limited="false" pos="0 0 0" type="slide" axis="1 0 0"/>
+  <joint damping="0" name="root_vertical" limited="false" pos="0 0 0" type="slide" axis="0 0 1"/>
+  <joint damping="0" name="root_pitch"    limited="false" pos="0 0 0" type="hinge" axis="0 1 0"/>
+</mujoco>
