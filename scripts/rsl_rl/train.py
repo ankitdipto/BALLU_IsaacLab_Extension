@@ -31,6 +31,8 @@ parser.add_argument("--common_folder", type=str, default=None,
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
 parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
+parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
+                   help="Buoyancy mass of the balloon")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -137,7 +139,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         env_cfg.rewards.track_lin_vel_xy_exp.params["std"] = math.sqrt(args_cli.reward_std)
     
     # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
+                   balloon_buoyancy_mass=args_cli.balloon_buoyancy_mass)
 
     # wrap for video recording
     if args_cli.video:
