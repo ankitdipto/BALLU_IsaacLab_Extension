@@ -36,5 +36,7 @@ _repo
 _build
 .lastformat
 
-**/*.csv
 **/videos*/*
+**/robots/FT*
+*.png
+*rewards*.csv
