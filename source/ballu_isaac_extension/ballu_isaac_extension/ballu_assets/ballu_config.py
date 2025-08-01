@@ -2,16 +2,32 @@ import isaaclab.sim as sim_utils
 from isaaclab.actuators import ImplicitActuatorCfg, SpringPDActuatorCfg
 from isaaclab.assets import ArticulationCfg
 import math
+import os
 ##
 # Configuration
 ##
 
+root_usd_path = os.path.dirname(os.path.abspath(__file__)) + "/robots"
+
 def degree_to_radian(degree):
     return degree * math.pi / 180.0
 
+def get_robot_usd_path():
+    """Get robot USD path, with support for morphology override via environment variable."""
+    # Check for morphology override environment variable
+    morphology_usd_path = os.environ.get('BALLU_MORPHOLOGY_USD_PATH')
+    if morphology_usd_path and os.path.exists(morphology_usd_path):
+        print(f"🤖 Using morphology override USD: {morphology_usd_path}")
+        return morphology_usd_path
+    else:
+        # Default to original robot
+        default_path = os.path.join(root_usd_path, "original", "original.usd")
+        print(f"🤖 Using default robot USD: {default_path}")
+        return default_path
+
 BALLU_REAL_CFG = ArticulationCfg(
     spawn=sim_utils.UsdFileCfg(
-        usd_path="/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/original/original.usd",
+        usd_path=get_robot_usd_path(),
         activate_contact_sensors=True,
         rigid_props=sim_utils.RigidBodyPropertiesCfg(
             rigid_body_enabled=True,
