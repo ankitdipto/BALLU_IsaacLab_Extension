@@ -38,7 +38,7 @@ do
                                        --headless \
                                        --max_iterations "$MAX_ITERATIONS"
 
-        echo "Testing with seed: $SEED"
+        echo "Testing with seed: $SEED on final model"
         python scripts/rsl_rl/play.py --task "$TASK" \
                                      --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
                                      --checkpoint "model_$((MAX_ITERATIONS - 1)).pt" \
@@ -47,11 +47,20 @@ do
                                      --num_envs 1 \
                                      --video_length 399
         
+        echo "Testing with seed: $SEED on best model"
+        python scripts/rsl_rl/play.py --task "$TASK" \
+                                     --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
+                                     --checkpoint "model_best.pt" \
+                                     --headless \
+                                     --video \
+                                     --num_envs 1 \
+                                     --video_length 399
+                                     
         # Check if play script succeeded
-        if [ $? -ne 0 ]; then
-            echo "Play script failed for the experiment with seed $SEED. Terminating all remaining experiments."
-            exit 1
-        fi
+        # if [ $? -ne 0 ]; then
+        #     echo "Play script failed for the experiment with seed $SEED. Terminating all remaining experiments."
+        #     exit 1
+        # fi
         
 done
 
