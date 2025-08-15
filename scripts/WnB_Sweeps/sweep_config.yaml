@@ -1,8 +1,8 @@
 program: scripts/WnB_Sweeps/sweep_agent.py
-method: random
+method: bayes
 metric:
   goal: maximize
-  name: max_reward
+  name: avg_play_reward
 parameters:
   gravity_comp_ratio:
     distribution: uniform
@@ -18,12 +18,12 @@ parameters:
     distribution: uniform
     min: 0.04
     max: 0.14
+  seed:
+    values: [0, 1, 2]
   # Fixed training parameters (can be modified as needed)
   task:
     value: "Isc-Vel-BALLU-encoder"
   max_iterations:
-    value: 2500
+    value: 6000
   num_envs:
     value: 4096
-  seed:
-    value: 42

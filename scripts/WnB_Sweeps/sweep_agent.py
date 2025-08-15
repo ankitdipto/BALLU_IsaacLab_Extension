@@ -57,7 +57,7 @@ def convert_ratio_to_usd_path(femur_to_tibia_ratio: float) -> str:
     return f"{folder_name}/{file_name}"
 
 
-def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
+def run_full_experiment(config: Dict[str, Any], timestamp: str) -> Dict[str, Any]:
     """
     Run a single training experiment with the given configuration.
     
@@ -87,7 +87,7 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
     morphology_name = extract_morphology_name(robot_morphology)
     
     # Create unique experiment ID
-    timestamp = datetime.now().strftime("%m_%d_%H_%M_%S")
+    # timestamp = datetime.now().strftime("%m_%d_%H_%M_%S")
     experiment_id = f"wb_sweep_{timestamp}_{morphology_name}_buoy{buoyancy_mass:.3f}_kneeEffLim{motor_limit:.3f}"
     
     print(f"\n🚀 Starting W&B Sweep Experiment")
@@ -169,8 +169,6 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
         
         # Monitor process with real-time output and W&B logging
         captured_output = []
-        #last_log_time = time.time()
-        # log_interval = 30  # Log to W&B every 30 seconds
         
         while True:
             output = process.stdout.readline()
@@ -180,16 +178,6 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
                 print(output.strip())
                 captured_output.append(output.strip())
                 
-        #         # Log intermediate progress to W&B
-        #         current_time = time.time()
-        #         if current_time - last_log_time > log_interval:
-        #             elapsed_minutes = (current_time - experiment_metadata['start_time']) / 60.0
-        #             wandb.log({
-        #                 'training_elapsed_minutes': elapsed_minutes,
-        #                 'training_status': 'running'
-        #             })
-        #             last_log_time = current_time
-        
         # Wait for process to complete
         process.wait()
         
@@ -204,47 +192,43 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
                 'captured_output_lines': len(captured_output)
             })
             
-            # Extract training results
-            try:
-                max_reward = extract_max_reward_from_logs(experiment_id, task, seed)
-                if max_reward is not None:
-                    experiment_metadata['max_reward'] = max_reward  # For W&B optimization
-                    print(f"📊 Extracted max reward: {max_reward:.4f}")
-                else:
-                    # Fallback: try to find log directory and extract directly
-                    log_dir = find_log_directory(experiment_id, seed)
-                    if log_dir:
-                        from sweep_utils import extract_max_reward_from_tensorboard
-                        max_reward = extract_max_reward_from_tensorboard(log_dir)
-                        if max_reward is not None:
-                            experiment_metadata['max_reward'] = max_reward
-                            
-                if 'max_reward' not in experiment_metadata:
-                    print("⚠️  Warning: Could not extract max reward, using 0.0")
-                    experiment_metadata['max_reward'] = 0.0
-                    
-            except Exception as e:
-                print(f"⚠️  Warning: Could not extract training results: {e}")
-                experiment_metadata['extraction_error'] = str(e)
-                experiment_metadata['max_reward'] = 0.0
+            # Run play script to evaluate the trained model
+            print(f"\n🎮 Starting play script evaluation...")
+            play_results = run_play_script(config, experiment_id, task, seed, buoyancy_mass, usd_path)
+            
+            # Integrate play results into experiment metadata
+            experiment_metadata.update(play_results)
+            
+            # Log play reward separately for analysis
+            if play_results['play_status'] == 'completed':
+                print(f"✅ Play evaluation completed with reward: {play_results['play_reward']:.4f}")
+            else:
+                print(f"❌ Play evaluation failed: {play_results.get('play_error', 'Unknown error')}")
             
             return experiment_metadata
-            
+        
         else:
-            print(f"❌ Training failed with return code: {process.returncode}")
-            # Show last part of output for debugging
-            if captured_output:
-                print("Last output lines:")
-                for line in captured_output[-10:]:
-                    print(f"  {line}")
-            
-            return {
-                **experiment_metadata,
-                'error': f"Training failed with return code {process.returncode}",
-                'status': 'failed',
+            print("❌ Training failed with return code: ", process.returncode, "but still trying to run play script")
+            experiment_metadata.update({
                 'end_time': time.time(),
-                'max_reward': 0.0,
-            }
+                'status': 'failed',
+                'duration_minutes': (time.time() - experiment_metadata['start_time']) / 60.0,
+                'captured_output_lines': len(captured_output)
+            })
+
+            # Run play script to evaluate the trained model upto the iterations where it failed
+            play_results = run_play_script(config, experiment_id, task, seed, buoyancy_mass, usd_path)
+            
+            # Integrate play results into experiment metadata
+            experiment_metadata.update(play_results)
+            
+            # Log play reward separately for analysis
+            if play_results['play_status'] == 'completed':
+                print(f"✅ Play evaluation completed with reward: {play_results['play_reward']:.4f}")
+            else:
+                print(f"❌ Play evaluation failed: {play_results.get('play_error', 'Unknown error')}")
+            
+            return experiment_metadata
             
     except subprocess.TimeoutExpired:
         print("⏰ Training timed out after 2 hours")
@@ -257,6 +241,7 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
             'end_time': time.time(),
             'max_reward': 0.0,
         }
+
     except Exception as e:
         print(f"❌ Error running training: {str(e)}")
         return {
@@ -264,7 +249,165 @@ def run_training_experiment(config: Dict[str, Any]) -> Dict[str, Any]:
             'error': str(e),
             'status': 'subprocess_error',
             'end_time': time.time(),
-            'max_reward': 0.0,
+        }
+
+
+def run_play_script(config: Dict[str, Any], experiment_id: str, task: str, seed: int, 
+                   buoyancy_mass: float, usd_path: str) -> Dict[str, Any]:
+    """
+    Run the play script to test the trained model.
+    
+    Args:
+        config: Configuration dictionary from W&B
+        experiment_id: Unique experiment identifier
+        task: Task name
+        seed: Random seed used in training
+        buoyancy_mass: Buoyancy mass parameter
+        usd_path: Path to the robot USD file
+        
+    Returns:
+        Dictionary containing play script results
+    """
+    print(f"\n🎮 Starting play script evaluation...")
+    
+    # Build play command
+    play_script = script_dir.parent / "rsl_rl" / "play_simple.py"
+    
+    # Find the checkpoint path based on experiment_id. 
+    # The training script creates a date-based folder, so we need to search for the experiment_id directory.
+    # log_root_path = Path("logs") / "rsl_rl"
+    # checkpoint_pattern = f"{log_root_path}/**/{experiment_id}/**/nn/*.pth"
+    
+    # print(f"🔍 Searching for checkpoints with pattern: {checkpoint_pattern}")
+    # checkpoint_files = list(Path(".").glob(checkpoint_pattern))
+    # checkpoint_files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+    # print(f"Found checkpoint files (after sorting): {checkpoint_files}")
+    
+    # if not checkpoint_files:
+    #     print(f"❌ No checkpoint found for experiment: {experiment_id}")
+    #     return {
+    #         'play_status': 'checkpoint_not_found',
+    #         'play_error': f'No checkpoint found matching pattern: {checkpoint_pattern}',
+    #         'play_reward': 0.0
+    #     }
+    
+    # Define the run name and checkpoint name for the play script.
+    # The play_simple.py script will handle locating the exact path.
+    run_name = f"{experiment_id}/seed_{seed}"
+    checkpoint_name = "model_best.pt"
+    motor_limit = config["motor_limit"]
+
+    print(f"▶️ Preparing to run play script with:")
+    print(f"   Run Name: {run_name}")
+    print(f"   Checkpoint: {checkpoint_name}")
+    print(f"   Motor Limit: {motor_limit}")
+    
+    cmd = [
+        sys.executable,
+        str(play_script),
+        "--task", task,
+        "--num_envs", "1",  # Single environment for evaluation
+        "--balloon_buoyancy_mass", str(buoyancy_mass),
+        "--load_run", run_name,
+        "--checkpoint", checkpoint_name,
+        "--headless",
+        "--video",
+        "--video_length", str(399),
+        f"env.scene.robot.actuators.knee_effort_actuators.effort_limit={motor_limit}"
+    ]
+    
+    # Set environment variables
+    env = os.environ.copy()
+    env['BALLU_MORPHOLOGY_USD_PATH'] = usd_path
+    env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
+    env['FORCE_GPU'] = '1'
+    
+    play_metadata = {
+        'play_start_time': time.time(),
+        'play_command': ' '.join(cmd),
+        'play_checkpoint': checkpoint_name,
+        'play_run': run_name
+    }
+    
+    try:
+        print(f"⚡ Running play command:")
+        print(f"   {' '.join(cmd)}")
+        
+        # Run play script with timeout (30 minutes max)
+        process = subprocess.Popen(
+            cmd,
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            universal_newlines=True
+        )
+        
+        # Monitor process output
+        captured_output = []
+        play_reward = None
+        
+        while True:
+            output = process.stdout.readline()
+            if output == '' and process.poll() is not None:
+                break
+            if output:
+                print(output.strip())
+                captured_output.append(output.strip())
+                
+                # Parse cumulative reward from output
+                if "Mean cumulative reward:" in output:
+                    try:
+                        reward_str = output.split("Mean cumulative reward:")[1].strip()
+                        play_reward = float(reward_str)
+                        print(f"🎯 Play reward extracted: {play_reward:.4f}")
+                    except (IndexError, ValueError):
+                        pass
+        
+        process.wait(timeout=7 * 60)
+        
+        if process.returncode == 0:
+            print("✅ Play script completed successfully!")
+            
+            # Default to 0.0 if reward couldn't be parsed
+            if play_reward is None:
+                print("⚠️  Could not parse play reward from output, using 0.0")
+                play_reward = 0.0
+            
+            return {
+                **play_metadata,
+                'play_status': 'completed',
+                'play_reward': play_reward,
+                'play_duration_minutes': (time.time() - play_metadata['play_start_time']) / 60.0,
+                'play_captured_output_lines': len(captured_output)
+            }
+        else:
+            print(f"❌ Play script failed with return code: {process.returncode}")
+            return {
+                **play_metadata,
+                'play_status': 'failed',
+                'play_error': f'Play script failed with return code {process.returncode}',
+                'play_reward': -3.0
+            }
+            
+    except subprocess.TimeoutExpired:
+        print("⏰ Play script timed out after 7 minutes")
+        process.kill()
+        process.wait()
+        return {
+            **play_metadata,
+            'play_status': 'timeout',
+            'play_error': 'Play script timed out',
+            'play_reward': -2.0
+        }
+    except Exception as e:
+        print(f"❌ Error running play script: {str(e)}")
+        return {
+            **play_metadata,
+            'play_status': 'error',
+            'play_error': str(e),
+            'play_reward': -1.0
         }
 
 
@@ -273,7 +416,7 @@ def main():
     parser = argparse.ArgumentParser(description="W&B Sweep Agent for BALLU Morphology Optimization")
     parser.add_argument("--project", type=str, default="ballu-morphology-sweep", 
                        help="W&B project name")
-    parser.add_argument("--entity", type=str, default=None, 
+    parser.add_argument("--entity", type=str, default="ankitdipto", 
                        help="W&B entity (username or team)")
     args, unknown = parser.parse_known_args()  # Ignore unknown arguments from W&B
     
@@ -283,6 +426,14 @@ def main():
     try:
         # Get configuration from W&B
         config = dict(wandb.config)
+        # config = {
+        #     'femur_to_tibia_ratio': 2.0,
+        #     'gravity_comp_ratio': 0.91,
+        #     'motor_limit': 0.1,
+        #     'task': 'Isc-Vel-BALLU-encoder',
+        #     'max_iterations': 100,
+        #     'num_envs': 4096,
+        # }
         
         print(f"\n🔍 W&B Sweep Configuration:")
         for key, value in config.items():
@@ -302,40 +453,57 @@ def main():
             'gravity_comp_ratio': config['gravity_comp_ratio'],
             'motor_limit': config['motor_limit'],
             'task': config['task'],
-            'seed': config['seed'],
             'max_iterations': config['max_iterations'],
             'num_envs': config['num_envs']
         })
         
-        # Run the training experiment
-        results = run_training_experiment(config)
-        
+        play_rewards = []
+        train_durations = []
+        play_durations = []
+        timestamp = datetime.now().strftime("%m_%d_%H_%M_%S")
+
+        # for seed in range(3):
+        # config['seed'] = seed
+        results = run_full_experiment(config, timestamp)
+        print("Printing experiment results: ", results)
         # Create comprehensive summary
-        summary = create_experiment_summary(config, results)
-        
+        # summary = create_experiment_summary(config, results)
+            
         # Log results to W&B
-        wandb.log(summary)
+        # wandb.log(summary)
         
+        play_reward = results.get('play_reward', -1.0)
+        play_rewards.append(play_reward)
+        train_durations.append(results.get('duration_minutes', -1))
+        play_durations.append(results.get('play_duration_minutes', -1))
+            
         # Log the key metric for optimization
-        max_reward = results.get('max_reward', 0.0)
-        wandb.log({'max_reward': max_reward})
+        avg_play_reward = sum(play_rewards) / len(play_rewards)
+        avg_train_duration = sum(train_durations) / len(train_durations)
+        avg_play_duration = sum(play_durations) / len(play_durations)
+        
+        wandb.log({
+            'avg_play_reward': avg_play_reward,
+            'avg_train_duration': avg_train_duration,
+            'avg_play_duration': avg_play_duration
+        })
         
         print(f"\n🎯 Final Results:")
-        print(f"   Status: {results.get('status', 'unknown')}")
-        print(f"   Max Reward: {max_reward:.4f}")
-        print(f"   Duration: {results.get('duration_minutes', 0):.2f} minutes")
+        print(f"   Avg Play Reward: {avg_play_reward:.4f}")
+        print(f"   Avg Train Duration: {avg_train_duration:.2f} minutes")
+        print(f"   Avg Play Duration: {avg_play_duration:.2f} minutes")
         print(f"   Morphology: {morphology_name}")
         print(f"   Gravity Comp Ratio: {config['gravity_comp_ratio']:.3f}")
         print(f"   Motor Limit: {config['motor_limit']:.3f}")
         
         # Set run summary
         wandb.run.summary.update({
-            'max_reward': max_reward,
+            'avg_play_reward': avg_play_reward,
+            'avg_train_duration': avg_train_duration,
+            'avg_play_duration': avg_play_duration,
             'morphology_name': morphology_name,
             'gravity_comp_ratio': config['gravity_comp_ratio'],
-            'motor_limit': config['motor_limit'],
-            'status': results.get('status', 'unknown'),
-            'duration_minutes': results.get('duration_minutes', 0)
+            'motor_limit': config['motor_limit']
         })
         
     except Exception as e:

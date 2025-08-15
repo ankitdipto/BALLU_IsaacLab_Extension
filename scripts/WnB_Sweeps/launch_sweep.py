@@ -65,7 +65,7 @@ def validate_sweep_config(config: Dict[str, Any]) -> bool:
     
     # Validate parameters
     parameters = config['parameters']
-    required_params = ['gravity_comp_ratio', 'femur_to_tibia_ratio', 'motor_limit']
+    required_params = ['gravity_comp_ratio', 'femur_to_tibia_ratio', 'motor_limit', 'seed']
     
     for param in required_params:
         if param not in parameters:
@@ -191,7 +191,7 @@ def main():
                        help="Path to sweep configuration YAML file")
     parser.add_argument("--project", type=str, default="Ballu-Morphology-Sweep",
                        help="W&B project name")
-    parser.add_argument("--entity", type=str, default=None,
+    parser.add_argument("--entity", type=str, default="ankitdipto",
                        help="W&B entity (username or team)")
     parser.add_argument("--description", type=str, 
                        default="BALLU robot morphology optimization using W&B Sweeps",

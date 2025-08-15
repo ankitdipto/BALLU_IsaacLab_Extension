@@ -164,7 +164,7 @@ def validate_experiment_config(config: Dict[str, Any]) -> bool:
     Returns:
         True if configuration is valid, False otherwise
     """
-    required_keys = ['gravity_comp_ratio', 'femur_to_tibia_ratio', 'motor_limit', 'task', 'max_iterations', 'num_envs', 'seed']
+    required_keys = ['gravity_comp_ratio', 'femur_to_tibia_ratio', 'motor_limit', 'task', 'max_iterations', 'num_envs']
     
     for key in required_keys:
         if key not in config:
@@ -173,7 +173,7 @@ def validate_experiment_config(config: Dict[str, Any]) -> bool:
     
     # Validate gravity compensation ratio range
     gravity_comp_ratio = config['gravity_comp_ratio']
-    if not (0.50 <= gravity_comp_ratio <= 1.15):
+    if not (0.30 <= gravity_comp_ratio <= 1.15):
         print(f"❌ Gravity comp ratio {gravity_comp_ratio} outside valid range [0.50, 1.15]")
         return False
     
@@ -237,12 +237,22 @@ def create_experiment_summary(config: Dict[str, Any], results: Dict[str, Any]) -
         'max_mean_reward': results.get('max_reward', None),
         'final_reward_mean': results.get('final_reward_mean', None),
         'duration_minutes': results.get('duration_minutes', None),
-        'experiment_id': results.get('experiment_id', None)
+        'experiment_id': results.get('experiment_id', None),
+        
+        # Play script results
+        'play_status': results.get('play_status', 'not_run'),
+        'play_reward': results.get('play_reward', None),
+        'play_duration_minutes': results.get('play_duration_minutes', None),
+        'play_checkpoint': results.get('play_checkpoint', None)
     }
     
     # Add additional metrics if available
     for key in ['final_surrogate_loss', 'final_value_function_loss', 'final_entropy_loss', 'final_noise_std_loss']:
         if key in results:
             summary[key] = results[key]
+    
+    # Add play script error if available
+    if 'play_error' in results:
+        summary['play_error'] = results['play_error']
     
     return summary
