@@ -242,7 +242,7 @@ def extract_tensorboard_data(log_dir: str) -> Dict[str, Any]:
             'Loss/surrogate': 'surrogate_loss',
             'Loss/value_function': 'value_function_loss',
             'Policy/mean_noise_std': 'policy_noise_std',
-            'Train/mean_reward': 'mean_cumulative_reward',
+            'Train/mean_reward': 'mean_reward',
         }
         
         extracted_metrics = {}
@@ -281,20 +281,20 @@ def extract_tensorboard_data(log_dir: str) -> Dict[str, Any]:
                         extracted_metrics['improvement_rate'] = (rewards[-1] - rewards[0]) / len(rewards)
         
         # Training loss metrics
-        if 'value_function_progression' in extracted_metrics and extracted_metrics['value_function_progression']:
-            value_losses = extracted_metrics['value_function_progression']
-            extracted_metrics['final_value_function'] = value_losses[-1]
-            extracted_metrics['initial_value_function'] = value_losses[0]
+        if 'value_function_loss_progression' in extracted_metrics and extracted_metrics['value_function_loss_progression']:
+            value_losses = extracted_metrics['value_function_loss_progression']
+            extracted_metrics['final_value_function_loss'] = value_losses[-1]
+            extracted_metrics['initial_value_function_loss'] = value_losses[0]
             
-        if 'surrogate_progression' in extracted_metrics and extracted_metrics['surrogate_progression']:
-            surrogate_losses = extracted_metrics['surrogate_progression']
-            extracted_metrics['final_surrogate'] = surrogate_losses[-1]
-            extracted_metrics['initial_surrogate'] = surrogate_losses[0]
+        if 'surrogate_loss_progression' in extracted_metrics and extracted_metrics['surrogate_loss_progression']:
+            surrogate_losses = extracted_metrics['surrogate_loss_progression']
+            extracted_metrics['final_surrogate_loss'] = surrogate_losses[-1]
+            extracted_metrics['initial_surrogate_loss'] = surrogate_losses[0]
             
-        if 'entropy_progression' in extracted_metrics and extracted_metrics['entropy_progression']:
-            entropy_values = extracted_metrics['entropy_progression']
-            extracted_metrics['final_entropy'] = entropy_values[-1]
-            extracted_metrics['initial_entropy'] = entropy_values[0]
+        if 'entropy_loss_progression' in extracted_metrics and extracted_metrics['entropy_loss_progression']:
+            entropy_values = extracted_metrics['entropy_loss_progression']
+            extracted_metrics['final_entropy_loss'] = entropy_values[-1]
+            extracted_metrics['initial_entropy_loss'] = entropy_values[0]
         
         results['tensorboard_data'] = extracted_metrics
         results['tensorboard_source'] = 'EventAccumulator'
