@@ -20,6 +20,8 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
+parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
+                   help="Buoyancy mass of the balloon")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -80,7 +82,8 @@ def main():
     print(f"[INFO] Saving plots to: {play_folder}")
 
     # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None)
+    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
+                   balloon_buoyancy_mass=args_cli.balloon_buoyancy_mass)
     # wrap for video recording
     
     if args_cli.video:
