@@ -316,6 +316,10 @@ class TerminationsCfg:
     """Termination terms for the MDP."""
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
+    # (2) Invalid simulator state (terminal)
+    invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 10.0})
+    # (3) Root height above hard limit (terminal)
+    root_height_above = DoneTerm(func=mdp.root_height_above, params={"z_limit": 3.0})
 
 ##
 # Environment configuration
