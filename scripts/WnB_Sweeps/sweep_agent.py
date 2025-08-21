@@ -78,6 +78,7 @@ def run_full_experiment(config: Dict[str, Any], timestamp: str) -> Dict[str, Any
     seed = config['seed']
     max_iterations = config['max_iterations']
     num_envs = config['num_envs']
+    spring_coefficient = config['spring_coefficient']
     
     # Convert decimal ratio to USD path
     robot_morphology = convert_ratio_to_usd_path(femur_to_tibia_ratio)
@@ -88,7 +89,7 @@ def run_full_experiment(config: Dict[str, Any], timestamp: str) -> Dict[str, Any
     
     # Create unique experiment ID
     # timestamp = datetime.now().strftime("%m_%d_%H_%M_%S")
-    experiment_id = f"wb_sweep_{timestamp}_{morphology_name}_buoy{buoyancy_mass:.3f}_kneeEffLim{motor_limit:.3f}"
+    experiment_id = f"wb_sweep_{timestamp}_{morphology_name}_buoy{buoyancy_mass:.3f}_sprCoef{spring_coefficient:.5f}"
     
     print(f"\n🚀 Starting W&B Sweep Experiment")
     print(f"🤖 Morphology: {morphology_name}")
@@ -111,6 +112,7 @@ def run_full_experiment(config: Dict[str, Any], timestamp: str) -> Dict[str, Any
         "--balloon_buoyancy_mass", str(buoyancy_mass),
         "--common_folder", experiment_id,
         f"env.scene.robot.actuators.knee_effort_actuators.effort_limit={motor_limit}",
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coefficient}",
         "--headless"
     ]
     
@@ -483,6 +485,8 @@ def main():
         avg_play_duration = sum(play_durations) / len(play_durations)
         
         wandb.log({
+            'experiment_id': results.get('experiment_id', 'N/A'),
+            'avg_velocity': avg_play_reward / 1600,
             'avg_play_reward': avg_play_reward,
             'avg_train_duration': avg_train_duration,
             'avg_play_duration': avg_play_duration
