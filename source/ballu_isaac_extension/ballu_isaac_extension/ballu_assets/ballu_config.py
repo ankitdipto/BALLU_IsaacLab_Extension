@@ -69,7 +69,7 @@ BALLU_REAL_CFG = ArticulationCfg(
             joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
             effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
             velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
-            spring_coeff=0.1409e-3 / degree_to_radian(1.0), # 0.4021 Nm/rad
+            spring_coeff=0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
             spring_damping=1.0e-2,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
             pd_p=0.08, #1.0,
