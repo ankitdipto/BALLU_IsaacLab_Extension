@@ -39,7 +39,9 @@ simulation_app = app_launcher.app
 import torch
 import gymnasium as gym
 from isaaclab.envs import ManagerBasedRLEnv
+import isaaclab.utils.math as math_utils
 from ballu_isaac_extension.tasks.ballu_locomotion.indirect_act_vel_env_cfg import BalluIndirectActEnvCfg
+from ballu_isaac_extension.tasks.ballu_locomotion.rough_dist_env_cfg import BalluRoughDistEnvCfg
 from action_generators import *
 import os
 #from ..rsl_rl.plotters import plot_root_com_xy
@@ -83,7 +85,7 @@ def plot_root_com_xy(root_com_xyz_hist_tch, num_envs, save_dir):
 def main():
     """Main function."""
     # create environment configuration
-    env_cfg = BalluIndirectActEnvCfg()
+    env_cfg = BalluRoughDistEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
     #env_cfg.scene.robot.spawn.usd_path = \
     #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
@@ -111,21 +113,48 @@ def main():
     neck_joint_pos_history = []
     root_com_xyz_history = []
     base_speed_history = []
+    # Track tibia endpoints (world frame). Uses URDF foot offset (0, 0.38485, 0) in tibia link frame.
+    # Get tibia body indices once.
+    left_tibia_ids, _ = robots.find_bodies("TIBIA_LEFT")
+    right_tibia_ids, _ = robots.find_bodies("TIBIA_RIGHT")
+    left_tibia_idx = left_tibia_ids[0]
+    right_tibia_idx = right_tibia_ids[0]
+    tibia_endpoints_world_history = []  # list of tensors shape (num_envs, 2, 3) per step [left,right]
     count = 0
     cum_rewards = 0
     while simulation_app.is_running():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            #actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
-            #actions = both_legs_0(num_envs=args_cli.num_envs)
+            actions = both_legs_0(num_envs=args_cli.num_envs)
             #actions = torch.zeros_like(env.action_manager.action)
             #actions = bang_bang_control(count, period=40, num_envs=args_cli.num_envs)
             obs, rew, terminated, truncated, info = env.step(actions)
             base_velocity = robots.data.root_lin_vel_b.clone().detach().cpu()
             base_speed_history.append(base_velocity)
+            # Compute tibia endpoints (world frame) for left/right tibias across all envs
+            # Link poses in world frame
+            link_pos_w = robots.data.body_link_pos_w  # (num_envs, num_bodies, 3)
+            link_quat_w = robots.data.body_link_quat_w  # (num_envs, num_bodies, 4) wxyz
+            # Select tibias
+            tibia_pos_w = torch.stack([
+                link_pos_w[:, left_tibia_idx, :],
+                link_pos_w[:, right_tibia_idx, :]
+            ], dim=1)  # (num_envs, 2, 3)
+            tibia_quat_w = torch.stack([
+                link_quat_w[:, left_tibia_idx, :],
+                link_quat_w[:, right_tibia_idx, :]
+            ], dim=1)  # (num_envs, 2, 4)
+            # URDF foot endpoint offset in tibia link frame
+            foot_offset_b = torch.tensor([0.0, 0.38485, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
+            foot_offset_b = foot_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape)  # (num_envs, 2, 3)
+            # Rotate offset into world and translate by link position
+            rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+            tibia_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
+            tibia_endpoints_world_history.append(tibia_endpoints_w.detach().cpu())
             #env_idx = 0
             #neck_joint_pos = robots.data.joint_pos[env_idx, neck_indices]
             #neck_joint_pos_history.append(neck_joint_pos.item())
@@ -139,8 +168,8 @@ def main():
             #torque_history.append(torques_applied_on_knees.cpu().numpy())
             cum_rewards += rew
             count += 1
-            # if count == 400:
-            #     break
+            #if count == 400:
+            #    break
             # if terminated.any() or truncated.any():
             #     print(f"[INFO]: Environments terminated after {count} steps.")
             #     break
@@ -154,6 +183,16 @@ def main():
     base_vel_std = base_speed_history.std(dim=0)
     print("base_vel_mean: ", base_vel_mean)
     print("base_vel_std: ", base_vel_std)
+    # Summarize tibia endpoint tracking
+    if len(tibia_endpoints_world_history) > 0:
+        tibia_endpoints_world_history = torch.stack(tibia_endpoints_world_history)  # (T, num_envs, 2, 3)
+        # Example: print last positions for env 0
+        last_left = tibia_endpoints_world_history[-1, 0, 0]
+        last_right = tibia_endpoints_world_history[-1, 0, 1]
+        print("Last tibia endpoints (world) for env 0 — Left:", last_left.numpy(), ", Right:", last_right.numpy())
+        # Optionally save to disk
+        np.save("tibia_endpoints_world.npy", tibia_endpoints_world_history.numpy())
+        print("Saved tibia endpoint history to tibia_endpoints_world.npy with shape:", tibia_endpoints_world_history.shape)
     #neck_joint_pos_history = np.array(neck_joint_pos_history)
     #print("neck_joint_pos_history: ", neck_joint_pos_history)
     # with open("neck_joint_pos_history.jsonl", "a") as f:
