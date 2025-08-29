@@ -7,7 +7,7 @@ specify the reward function and its parameters.
 from __future__ import annotations
 
 import torch
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast, Any
 
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.contact_sensor.contact_sensor import ContactSensor
@@ -21,9 +21,23 @@ def forward_velocity_x(
     env: ManagerBasedRLEnv,
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> torch.Tensor:
-    """Reward absolute velocity in the XY plane"""
+    """Reward forward velocity along the x-axis"""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
-    return asset.data.root_lin_vel_b[:, 0]
+    Vx = torch.nan_to_num(asset.data.root_lin_vel_b[:, 0], nan=0.0)
+    Vx = torch.where(Vx > 0.5, torch.zeros_like(Vx), Vx)
+    # Vx = torch.clamp(Vx, min=-0.5) # This component introduced severe learning slowdown in the rough terrain environment. Better to keep it disabled unless absolutely necessary.
+    return Vx
+
+def lateral_velocity_y(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> torch.Tensor:
+    """Reward lateral velocity along the y-axis"""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    Vy = torch.nan_to_num(asset.data.root_lin_vel_b[:, 1], nan=0.0)
+    Vy = torch.clamp(Vy, min=-0.5, max=0.5)
+    Vy = torch.abs(Vy)
+    return Vy
 
 def track_lin_vel_xy_base_l2(
     env: ManagerBasedRLEnv, command_name: str, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")
@@ -35,6 +49,9 @@ def track_lin_vel_xy_base_l2(
                     asset.data.root_lin_vel_b[:, :2]),
         dim=1,
     )
+    # replace NaNs with large finite numbers
+    lin_vel_error = torch.nan_to_num(lin_vel_error, nan=1e6)
+    
     return 1 - lin_vel_error
 
 def track_lin_vel_xy_base_exp_ballu(
@@ -49,6 +66,9 @@ def track_lin_vel_xy_base_exp_ballu(
                     asset.data.root_lin_vel_b[:, :2]),
         dim=1,
     )
+    # replace NaNs with large finite numbers
+    lin_vel_error = torch.nan_to_num(lin_vel_error, nan=1e6)
+
     return torch.exp(-lin_vel_error / std**2)
 
 def track_lin_vel_xy_world_exp_ballu(
@@ -63,9 +83,12 @@ def track_lin_vel_xy_world_exp_ballu(
                     asset.data.root_lin_vel_w[:, :2]),
         dim=1,
     )
+    # replace NaNs with large finite numbers
+    lin_vel_error = torch.nan_to_num(lin_vel_error, nan=1e6)
+
     return torch.exp(-lin_vel_error / std**2)
 
-def feet_air_time_positive_biped(env, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
+def feet_air_time_positive_biped(env: ManagerBasedRLEnv, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """Reward long steps taken by the feet for bipeds.
 
     This function rewards the agent for taking steps up to a specified threshold and also keep one foot at
@@ -73,10 +96,22 @@ def feet_air_time_positive_biped(env, command_name: str, threshold: float, senso
 
     If the commands are small (i.e. the agent is not supposed to take a step), then the reward is zero.
     """
-    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    # scene.sensors[...] is typed as SensorBase; cast to ContactSensor
+    contact_sensor = cast(ContactSensor, env.scene.sensors[sensor_cfg.name])
+    # Guard: body_ids may be Optional in SceneEntityCfg
+    body_ids = sensor_cfg.body_ids
+    if body_ids is None:
+        raise RuntimeError("sensor_cfg.body_ids is None; please configure body_ids for the contact sensor.")
+    # Help static type narrowing: from Optional[...] to concrete type
+    assert body_ids is not None
+    idxs = cast(Any, body_ids)
     # compute the reward
-    air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
-    contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids]
+    air_time_arr = contact_sensor.data.current_air_time
+    contact_time_arr = contact_sensor.data.current_contact_time
+    if air_time_arr is None or contact_time_arr is None:
+        raise RuntimeError("ContactSensor data arrays (air/contact time) are not available.")
+    air_time = air_time_arr[:, idxs]
+    contact_time = contact_time_arr[:, idxs]
     in_contact = contact_time > 0.0
     in_mode_time = torch.where(in_contact, contact_time, air_time)
     single_stance = torch.sum(in_contact.int(), dim=1) == 1
@@ -95,11 +130,23 @@ def feet_slide(env, sensor_cfg: SceneEntityCfg, asset_cfg: SceneEntityCfg = Scen
     agent is penalized only when the feet are in contact with the ground.
     """
     # Penalize feet sliding
-    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
-    contacts = contact_sensor.data.net_forces_w_history[:, :, sensor_cfg.body_ids, :].norm(dim=-1).max(dim=1)[0] > 1.0
+    contact_sensor = cast(ContactSensor, env.scene.sensors[sensor_cfg.name])
+    body_ids = sensor_cfg.body_ids
+    if body_ids is None:
+        raise RuntimeError("sensor_cfg.body_ids is None; please configure body_ids for the contact sensor.")
+    assert body_ids is not None
+    idxs = body_ids
+    forces_hist = contact_sensor.data.net_forces_w_history
+    if forces_hist is None:
+        raise RuntimeError("ContactSensor net_forces_w_history is not available.")
+    contacts = forces_hist[:, :, idxs, :].norm(dim=-1).max(dim=1)[0] > 1.0
     asset = env.scene[asset_cfg.name]
 
-    body_vel = asset.data.body_lin_vel_w[:, asset_cfg.body_ids, :2]
+    asset_body_ids = asset_cfg.body_ids
+    if asset_body_ids is None:
+        raise RuntimeError("asset_cfg.body_ids is None; please configure body_ids for the robot.")
+    assert asset_body_ids is not None
+    body_vel = asset.data.body_lin_vel_w[:, asset_body_ids, :2]
     reward = torch.sum(body_vel.norm(dim=-1) * contacts, dim=1)
     return reward
 
