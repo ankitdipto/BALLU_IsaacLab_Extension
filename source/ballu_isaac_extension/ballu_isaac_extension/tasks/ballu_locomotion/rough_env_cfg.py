@@ -12,6 +12,7 @@ from isaaclab.assets import ArticulationCfg, AssetBaseCfg
 from isaaclab.envs import ManagerBasedRLEnvCfg
 from isaaclab.managers import EventTermCfg as EventTerm
 from isaaclab.managers import ObservationGroupCfg as ObsGroup
+from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
@@ -52,7 +53,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         prim_path="/World/terrain",
         terrain_type="generator",
         terrain_generator=BALLU_TERRAINS_CFG,
-        max_init_terrain_level=5,
+        max_init_terrain_level=2,
         collision_group=-1,
         physics_material=sim_utils.RigidBodyMaterialCfg(
             friction_combine_mode="multiply",
@@ -70,20 +71,21 @@ class BALLUSceneCfg(InteractiveSceneCfg):
 
     # BALLU
     robot: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot.init_state.pos = (0.0, 0.0, 0.9)
 
     # lights
-    dome_light = AssetBaseCfg(
-        prim_path="/World/DomeLight",
-        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
-    )
-
-    # sky_light = AssetBaseCfg(
-    #     prim_path="/World/skyLight",
-    #     spawn=sim_utils.DomeLightCfg(
-    #         intensity=750.0,
-    #         texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
-    #     ),
+    # dome_light = AssetBaseCfg(
+    #     prim_path="/World/DomeLight",
+    #     spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
     # )
+
+    sky_light = AssetBaseCfg(
+        prim_path="/World/skyLight",
+        spawn=sim_utils.DomeLightCfg(
+            intensity=500.0,
+            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+        ),
+    )
 
     # contact sensors at feet
     #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
@@ -103,7 +105,7 @@ class ConstantVelCommandCfg:
         heading_command=False,  # Not using heading commands
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.25, 0.25),  # Constant x-velocity of 0.25 m/s
+            lin_vel_x=(0.23, 0.23),  # Constant x-velocity of 0.23 m/s
             lin_vel_y=(0.0, 0.0),  # No y-velocity
             ang_vel_z=(0.0, 0.0),  # No angular velocity
         ),
@@ -170,13 +172,13 @@ class RewardsCfg:
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
-        weight=0.0,
+        weight=4.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
     track_lin_vel_xy_base_exp = RewTerm(
         func=mdp.track_lin_vel_xy_base_exp_ballu, 
-        weight=1.0, 
+        weight=0.0, 
         params=
             {
                 "command_name": "base_velocity", 
@@ -193,6 +195,12 @@ class RewardsCfg:
             }
     )
 
+    # Penalize lateral velocity
+    lateral_vel_base = RewTerm(
+        func=mdp.lateral_velocity_y,
+        weight=0.0,
+    )
+
 @configclass
 class TerminationsCfg:
     """Termination terms for the MDP."""
@@ -206,14 +214,15 @@ class TerminationsCfg:
 @configclass
 class CurriculumsCfg:
     """Curriculums for the MDP."""
-    
+    terrain_levels = CurrTerm(func=mdp.terrain_levels_ballu)
+
 ##
 # Environment configuration
 ##
 
 
 @configclass
-class BalluRoughDistEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
+class BalluRoughEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
     """Configuration for the BALLU robot environment with indirect actuation."""
 
     # Scene settings
@@ -235,8 +244,8 @@ class BalluRoughDistEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (2, 5, 3)
-        self.viewer.lookat = (2, 0, 0.3)
+        # self.viewer.eye = (-5.0, 6.0, 1.6)
+        # self.viewer.lookat = (-5.0, 0.0, 0.3)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
@@ -246,3 +255,12 @@ class BalluRoughDistEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.sim.physx.solver_type = 1 # Truncated Gauss-Seidel
         self.sim.physx.min_position_iteration_count = 1
         self.sim.physx.min_velocity_iteration_count = 1
+
+        # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
+        # this generates terrains with increasing difficulty and is useful for training
+        #if getattr(self.curriculum, "terrain_levels", None) is not None:
+        #    if self.scene.terrain.terrain_generator is not None:
+        self.scene.terrain.terrain_generator.curriculum = True
+        # else:
+        #   if self.scene.terrain.terrain_generator is not None:
+        #       self.scene.terrain.terrain_generator.curriculum = False
