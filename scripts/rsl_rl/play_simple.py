@@ -145,7 +145,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # print cumulative rewards
     print(f"[INFO] Episode completed after {timestep} steps")
-    print(f"[INFO] Cumulative rewards: {cumulative_rewards}")
+    # print(f"[INFO] Cumulative rewards: {cumulative_rewards}")
     print(f"[INFO] Mean cumulative reward: {cumulative_rewards.mean().item():.4f}")
     if env.num_envs > 1:
         print(f"[INFO] Std cumulative reward: {cumulative_rewards.std().item():.4f}")

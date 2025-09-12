@@ -107,7 +107,7 @@ class ConstantVelCommandCfg:
         heading_command=False,  # Not using heading commands
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.1927, 0.1927),  # Constant 0.1927 m/s along +x
+            lin_vel_x=(0.23, 0.23),  # Constant 0.1927 m/s along +x
             lin_vel_y=(0.0, 0.0),  # No y-velocity
             ang_vel_z=(0.0, 0.0),  # No angular velocity
         ),
@@ -210,7 +210,7 @@ class RewardsCfg:
         params=
             {
                 "command_name": "base_velocity", 
-                "std": 0.2
+                "std": 0.5
             }
     )
     track_lin_vel_xy_world_exp = RewTerm(
@@ -223,6 +223,11 @@ class RewardsCfg:
             }
     )
 
+    # Penalize lateral velocity
+    lateral_vel_base = RewTerm(
+        func=mdp.lateral_velocity_y,
+        weight=-2.0,
+    )
     # Penalty to enforce joint actions are within bounds
     # joint_torques_out_of_bounds = RewTerm(
     #     func=mdp.joint_torques_out_of_bounds,
@@ -327,8 +332,8 @@ class TerminationsCfg:
 
 
 @configclass
-class BalluIndirectActEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
-    """Configuration for the BALLU robot environment with indirect actuation."""
+class BalluFlatEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
+    """Configuration for the BALLU robot environment with flat terrain."""
 
     # Scene settings
     scene: BALLUSceneCfg = BALLUSceneCfg(num_envs=4096, env_spacing=4.0)

@@ -23,6 +23,7 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
 parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
                    help="Buoyancy mass of the balloon")
+parser.add_argument("--trn_height", type=float, default=None, help="Height of the terrain.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -63,34 +64,12 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlVecEnvWrapper, expor
 from isaaclab_tasks.utils import get_checkpoint_path, parse_env_cfg
 from isaaclab_tasks.utils.hydra import hydra_task_config
 
-from plotters import (
-    plot_joint_data, 
-    plot_root_com_xy, 
-    plot_feet_heights, 
-    plot_base_velocity, 
-    plot_knee_phase_portraits, 
-    plot_toe_heights,
-    plot_local_positions_scatter
-)
-from evals.evaluate_obstacle_stepping_task import threshold_based_verification
-#from ..scratchpad.action_generators import stepper
+from plotters import plot_joint_data, plot_root_com_xy, plot_feet_heights, plot_base_velocity, plot_knee_phase_portraits
 #from isaacsim.core.utils.transformations import transform_points
 #from isaacsim.debug_draw import _debug_draw as debug_draw
 
 # Import extensions to set up environment tasks
 import ballu_isaac_extension.tasks  # noqa: F401
-import isaaclab.utils.math as math_utils
-
-def stepper(step_count, period=200, num_envs=1):
-    """
-    Stepper controller for joint actuation.
-    """
-    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
-    if step_count % period < period / 2:
-        actions[:, 0] = 1.0
-    else:
-        actions[:, 1] = 1.0
-    return actions
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
@@ -99,7 +78,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-
+    env_cfg.scene.terrain.terrain_generator.sub_terrains["boxes"].grid_height_range = (args_cli.trn_height, args_cli.trn_height)
+    
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
@@ -109,10 +89,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"[INFO] checkpoint_path: {checkpoint_path}")
     print(f"[INFO] log_dir: {log_dir}")
 
-    timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
+    # timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
 
     # create debug directory for this run
-    play_folder = os.path.join(log_dir, "play", timestamp, f"{agent_cfg.load_checkpoint[:-3]}")
+    play_folder = os.path.join(log_dir, "play", f"{agent_cfg.load_checkpoint[:-3]}", f"trnHt_{args_cli.trn_height}")
     os.makedirs(play_folder, exist_ok=True)
     print(f"[INFO] Saving plots to: {play_folder}")
 
@@ -167,7 +147,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     root_com_xyz_history = []
     left_foot_pos_history = []
     right_foot_pos_history = []
-    toe_endpoints_world_history = []  # list of tensors (num_envs, 2, 3) per step
     base_vel_history = []
     actions_history = []
     comp_torq_history = []
@@ -194,9 +173,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         with torch.inference_mode():
             # agent stepping
             actions = policy(obs)
-            # actions = stepper(timestep,
-            #                   period=40,
-            #                   num_envs=env.num_envs)
             # env stepping
             obs, rew, _, _ = env.step(actions)
             # Store rewards for plotting
@@ -221,51 +197,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             if timestep == 1:
                 print("Available body names:", robots_data.body_names)
                 robot_jnt_names = robots_data.joint_names
-            # Extract toe endpoints (world) from tibia link poses if indices available
-            if left_tibia_idx is not None and right_tibia_idx is not None:
-                link_pos_w = robots.data.body_link_pos_w  # (num_envs, num_bodies, 3)
-                link_quat_w = robots.data.body_link_quat_w  # (num_envs, num_bodies, 4) wxyz
-                tibia_pos_w = torch.stack([
-                    link_pos_w[:, left_tibia_idx, :],
-                    link_pos_w[:, right_tibia_idx, :]
-                ], dim=1)  # (num_envs, 2, 3)
-                tibia_quat_w = torch.stack([
-                    link_quat_w[:, left_tibia_idx, :],
-                    link_quat_w[:, right_tibia_idx, :]
-                ], dim=1)  # (num_envs, 2, 4)
-                foot_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
-                foot_offset_b = foot_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape)
-                rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
-                toe_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
-                toe_endpoints_world_history.append(toe_endpoints_w.detach().cpu())
-                # Keep backward-compatible single foot positions for any other plots if needed
-                left_foot_pos = toe_endpoints_w[:, 0, :]
-                right_foot_pos = toe_endpoints_w[:, 1, :]
-
-            # --- DebugDraw visualization for feet ---
-            # if left_foot_pos is not None:
-            #     for env_idx in range(left_foot_pos.shape[0]):
-            #         pos = left_foot_pos[env_idx].cpu().numpy().tolist()
-            #         debug_draw_instance.draw_sphere(
-            #             position=pos,
-            #             color=[1.0, 0.5, 0.0, 1.0],  # Orange RGBA
-            #             radius=0.025
-            #         )
-            # if right_foot_pos is not None:
-            #     for env_idx in range(right_foot_pos.shape[0]):
-            #         pos = right_foot_pos[env_idx].cpu().numpy().tolist()
-            #         debug_draw_instance.draw_sphere(
-            #             position=pos,
-            #             color=[0.0, 0.8, 0.0, 1.0],  # Green RGBA
-            #             radius=0.025
-            #         )
-            # Store positions (ensure shape [1, envs, 3] per step for plotting)
-            if left_foot_pos is not None and right_foot_pos is not None:
-                left_foot_pos_history.append(left_foot_pos.unsqueeze(0))
-                right_foot_pos_history.append(right_foot_pos.unsqueeze(0))
-            else:
-                left_foot_pos_history.append(None)
-                right_foot_pos_history.append(None)
+            
+            # Store positions
+            left_foot_pos_history.append(left_foot_pos)
+            right_foot_pos_history.append(right_foot_pos)
             # Store joint positions and velocities
             joint_pos_history.append(joint_pos)
             joint_vel_history.append(joint_vel)
@@ -282,9 +217,6 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         #if timestep == 400: # TODO: Remove this
         #    break
 
-    # Before closing the simulator evaluate the performance
-    successes, local_positions = threshold_based_verification(env.unwrapped)
-    success_rate = successes.float().mean().item()
     # close the simulator (Very very important)
     env.close()
 
@@ -296,19 +228,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     actions_hist_tch = torch.stack(actions_history)
     comp_torq_hist_tch = torch.stack(comp_torq_history)
     applied_torq_hist_tch = torch.stack(applied_torq_history)
-    # Toe endpoints history if available
-    toe_endpoints_world_hist_tch = torch.stack(toe_endpoints_world_history)
-    # tibia_endpoints_hist_tch = None
-    #if len(toe_endpoints_world_history) > 0:
-
     # Generate plots
-    #plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
+    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
-    # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
+    plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
     plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)
-    # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
-    plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, play_folder)
-    plot_local_positions_scatter(local_positions, play_folder, threshold_x=1.7, success_rate=success_rate)
+    plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
+    
     # Save data to CSV file for env_idx=0
     env_idx = 0
     
@@ -356,14 +282,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print("base_vel_mean of RL policy: ", base_vel_mean)
     print("base_vel_std of RL policy: ", base_vel_std)
     print("cumulative rewards of RL policy: ", cum_rewards)
-    print("success rate of RL policy: ", success_rate)
 
 if __name__ == "__main__":
     # run the main function
-    try:
-        main()
-    except Exception as e:
-        raise e
-    finally:
-        # close sim app
-        simulation_app.close()
+    main()
+    # close sim app
+    simulation_app.close()

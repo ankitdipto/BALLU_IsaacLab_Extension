@@ -70,7 +70,22 @@ def plot_root_com_xy(root_com_xyz_hist_tch, num_envs, save_dir):
     for env_idx in range(num_envs):
         plt.plot(all_xy[env_idx][:, 1], all_xy[env_idx][:, 0], 
                 label=f'Env {env_idx}', alpha=0.7)
-    plt.gca().invert_xaxis()  # Invert X so positive Y points left
+
+    # Enforce equal scaling on X and Y axes
+    ax = plt.gca()
+    x_vals = all_xy[:, :, 1].reshape(-1)
+    y_vals = all_xy[:, :, 0].reshape(-1)
+    x_min, x_max = np.nanmin(x_vals), np.nanmax(x_vals)
+    y_min, y_max = np.nanmin(y_vals), np.nanmax(y_vals)
+    x_c, y_c = (x_min + x_max) / 2.0, (y_min + y_max) / 2.0
+    half_span = max(x_max - x_min, y_max - y_min) / 2.0
+    # In case of degenerate span, use a tiny epsilon to avoid zero range
+    if half_span == 0:
+        half_span = 1e-6
+    ax.set_aspect('equal', adjustable='box')
+    ax.set_xlim(x_c - half_span, x_c + half_span)
+    ax.set_ylim(y_c - half_span, y_c + half_span)
+    ax.invert_xaxis()  # Invert X so positive Y points left
     
     plt.title(f'Root COM (Y,X) Positions (X↑, Y←) (All {num_envs} Environments)')
     plt.xlabel('Y Position')  # Now horizontal, but inverted
@@ -118,7 +133,7 @@ def plot_feet_heights(left_foot_pos_history, right_foot_pos_history, num_envs, s
     
     axs[-1, 0].set_xlabel('Timestep')
     plt.suptitle('Feet Heights (Z) Over Time (All Environments)')
-    plt.tight_layout(rect=[0, 0.03, 1, 0.97])
+    plt.tight_layout(rect=(0, 0.03, 1, 0.97))
     
     feet_plot_path = os.path.join(save_dir, 'feet_heights_z_all_envs.png')
     plt.savefig(feet_plot_path, bbox_inches='tight', dpi=300)
@@ -194,7 +209,7 @@ def plot_base_velocity(base_vel_hist_tch, num_envs, save_dir):
     
     # Add overall title with more space
     plt.suptitle('Base Velocity Over Time (All Environments)', y=0.98)
-    plt.tight_layout(rect=[0, 0, 1, 0.92])  # Increase top margin for title and legend
+    plt.tight_layout(rect=(0, 0, 1, 0.92))  # Increase top margin for title and legend
     
     # Save the figure
     vel_plot_path = os.path.join(save_dir, 'base_velocity_all_envs.png')
@@ -266,10 +281,108 @@ def plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, joint_name
                         annotation_clip=True)
     
     plt.suptitle('Knee Joint Phase Portraits (Position vs. Velocity)', y=0.98)
-    plt.tight_layout(rect=[0, 0, 1, 0.96])  # Make room for the title
+    plt.tight_layout(rect=(0, 0, 1, 0.96))  # Make room for the title
     
     # Save the figure
     phase_plot_path = os.path.join(save_dir, 'knee_phase_portraits.png')
     plt.savefig(phase_plot_path, bbox_inches='tight', dpi=300)
     plt.close()
     print(f"[INFO] Saved knee joint phase portraits to {phase_plot_path}")
+
+def plot_toe_heights(tibia_endpoints_hist_tch, num_envs, save_dir):
+    """Plot toe heights (Z) over time for all environments as subplots in a single figure.
+    
+    Args:
+        tibia_endpoints_hist_tch: Tensor of toe endpoints world positions [timesteps, envs, 2, 3]
+        num_envs: Number of environments
+        save_dir: Directory to save plots
+    """
+    if tibia_endpoints_hist_tch is None or tibia_endpoints_hist_tch.numel() == 0:
+        print("[INFO] Skipping toe height plots due to missing data")
+        return
+    # Convert to numpy for plotting
+    toe_np = tibia_endpoints_hist_tch.cpu().numpy()  # shape: (T, E, 2, 1, 3)
+    toe_np = toe_np.squeeze(3)
+    print("toe_np.shape: ", toe_np.shape)
+    timesteps = toe_np.shape[0]
+    
+    # Calculate grid dimensions for a balanced layout
+    n_cols = int(np.ceil(np.sqrt(num_envs)))
+    n_rows = int(np.ceil(num_envs / n_cols))
+    
+    # Dynamic figure size
+    fig_width = max(4 * n_cols, 8)
+    fig_height = max(3 * n_rows, 6)
+    
+    fig, axs = plt.subplots(n_rows, n_cols, figsize=(fig_width, fig_height), squeeze=False)
+    
+    env_idx = 0
+    for row in range(n_rows):
+        for col in range(n_cols):
+            if env_idx < num_envs:
+                ax = axs[row, col]
+                # Left toe (index 0), Right toe (index 1)
+                ax.plot(range(timesteps), toe_np[:, env_idx, 0, 2], label='Left Toe Z', color='#1f77b4', alpha=0.8, linewidth=1.5)
+                ax.plot(range(timesteps), toe_np[:, env_idx, 1, 2], label='Right Toe Z', color='#d62728', alpha=0.8, linewidth=1.5)
+                ax.set_ylabel('Height Z (m)')
+                ax.set_xlabel('Timestep')
+                ax.set_title(f'Env {env_idx}')
+                ax.grid(True)
+                # Only add legend to the first subplot
+                if row == 0 and col == 0:
+                    ax.legend(loc='upper right')
+                env_idx += 1
+            else:
+                axs[row, col].set_visible(False)
+    
+    # Add a single legend for the entire figure
+    handles, labels = axs[0, 0].get_legend_handles_labels()
+    if handles:
+        fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 0.96), ncol=2)
+    
+    plt.suptitle('Toe Heights (Z) Over Time (All Environments)', y=0.99)
+    plt.tight_layout(rect=(0, 0, 1, 0.94))
+    
+    plot_path = os.path.join(save_dir, 'toe_heights_all_envs.png')
+    plt.savefig(plot_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    print(f"[INFO] Saved toe heights plot to {plot_path}")
+
+
+def plot_local_positions_scatter(local_positions_tch, save_dir, threshold_x=1.7, success_rate: float | None = None):
+    """Scatter plot of final local positions (X vs Y) for all environments.
+    
+    Args:
+        local_positions_tch: Tensor of shape (num_envs, 3) with local XYZ positions.
+        save_dir: Directory to save the plot.
+        threshold_x: Success threshold along local X (m). Default: 1.7.
+    """
+    if local_positions_tch is None or local_positions_tch.numel() == 0:
+        print("[INFO] Skipping local positions scatter due to missing data")
+        return
+
+    lp = local_positions_tch.detach().cpu().numpy()  # (E, 3)
+    x = lp[:, 0]
+    y = lp[:, 1]
+
+    plt.figure(figsize=(8, 8))
+    plt.scatter(x, y, c="#1f77b4", alpha=0.85, edgecolors="k", linewidths=0.5, label="Env final pos")
+    plt.axvline(threshold_x, color="#d62728", linestyle="--", linewidth=2.0, label=f"x = {threshold_x} m")
+
+    ax = plt.gca()
+    ax.set_aspect('equal', adjustable='box')
+    plt.xlabel('Local X (m)')
+    plt.ylabel('Local Y (m)')
+    title = 'Final Local Positions (XY)'
+    if success_rate is not None:
+        title += f'  |  Success Rate: {success_rate:.2%}'
+    plt.title(title)
+    plt.grid(True)
+    plt.legend(loc='best')
+    plt.tight_layout()
+
+    plot_path = os.path.join(save_dir, 'final_local_positions_scatter.png')
+    plt.savefig(plot_path, bbox_inches='tight', dpi=300)
+    plt.close()
+    print(f"[INFO] Saved local positions scatter to {plot_path}")
+

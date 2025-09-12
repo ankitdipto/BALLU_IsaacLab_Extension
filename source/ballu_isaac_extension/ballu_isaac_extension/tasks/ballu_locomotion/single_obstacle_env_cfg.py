@@ -19,10 +19,8 @@ from isaaclab.managers import TerminationTermCfg as DoneTerm
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
 import isaaclab.sim as sim_utils
-from isaaclab.terrains import TerrainImporterCfg
-from ballu_isaac_extension.ballu_assets.terrain_config import BALLU_TERRAINS_CFG, BALLU_TERRAINS_CFG_PLAY
 from isaaclab.utils import configclass
-from isaaclab.utils.assets import ISAACLAB_NUCLEUS_DIR, ISAAC_NUCLEUS_DIR
+from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
 
 ##
 # Scene definition
@@ -34,50 +32,52 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     """Configuration for a BALLU robot scene."""
 
     # ground plane
-    # ground = AssetBaseCfg(
-    #     prim_path="/World/ground",
-    #     spawn=sim_utils.GroundPlaneCfg(
-    #         size=(100.0, 100.0),
-    #         # physics_material=sim_utils.RigidBodyMaterialCfg(
-    #         #     static_friction=0.5,  # Default: 0.5
-    #         #     dynamic_friction=0.5,  # Default: 0.5
-    #         #     restitution=0.0,      # Default: 0.0
-    #         #     friction_combine_mode="multiply",  # Default: "average"
-    #         #     restitution_combine_mode="multiply",  # Default: "average"
-    #         # ),
-    #     ),
-    # )
-
-    # terrain
-    terrain = TerrainImporterCfg(
-        prim_path="/World/terrain",
-        terrain_type="generator",
-        terrain_generator=BALLU_TERRAINS_CFG,
-        max_init_terrain_level=0,
-        collision_group=-1,
-        physics_material=sim_utils.RigidBodyMaterialCfg(
-            friction_combine_mode="multiply",
-            restitution_combine_mode="multiply",
-            static_friction=1.0,
-            dynamic_friction=1.0,
+    terrain = AssetBaseCfg(
+        prim_path="/World/ground",
+        spawn=sim_utils.GroundPlaneCfg(
+            size=(100.0, 100.0),
+            physics_material=sim_utils.RigidBodyMaterialCfg(
+                static_friction=0.5,  # Default: 0.5
+                dynamic_friction=0.5,  # Default: 0.5
+                restitution=0.0,      # Default: 0.0
+                friction_combine_mode="multiply",  # Default: "average"
+                restitution_combine_mode="multiply",  # Default: "average"
+            ),
         ),
-        visual_material=sim_utils.MdlFileCfg(
-            mdl_path=f"{ISAACLAB_NUCLEUS_DIR}/Materials/TilesMarbleSpiderWhiteBrickBondHoned/TilesMarbleSpiderWhiteBrickBondHoned.mdl",
-            project_uvw=True,
-            texture_scale=(0.25, 0.25),
+    )
+    # obstacle - cuboid
+    obstacle = AssetBaseCfg(
+        prim_path="{ENV_REGEX_NS}/obstacle",
+        spawn=sim_utils.CuboidCfg(
+            size=(2.0, 2.0, 0.055),
+            # Make it collide and fix it in place (kinematic)
+            collision_props=sim_utils.CollisionPropertiesCfg(),
+            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+            # Use default reasonable friction/restitution
+            physics_material=sim_utils.RigidBodyMaterialCfg(),
+            # Marble-like visual material
+            visual_material=sim_utils.PreviewSurfaceCfg(
+                diffuse_color=(0.2, 0.2, 0.2),  # Light gray marble
+                roughness=0.2,  # Slightly glossy
+                metallic=0.1,  # Subtle metallic sheen
+            ),
         ),
-        debug_vis=False,
+        # Place so it rests on ground (height/2) and rotate 45 deg about z
+        init_state=AssetBaseCfg.InitialStateCfg(
+            pos=(2.5, 0.0, 0.0275),
+            rot=(1.0, 0.0, 0.0, 0.0),
+        ),
     )
 
     # BALLU
     robot: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
-    robot.init_state.pos = (0.0, 0.0, 0.9)
+    # robot.init_state.pos = (0.0, 0.0, 0.9)
 
     # lights
-    # dome_light = AssetBaseCfg(
-    #     prim_path="/World/DomeLight",
-    #     spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
-    # )
+    dome_light = AssetBaseCfg(
+        prim_path="/World/DomeLight",
+        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
+    )
 
     sky_light = AssetBaseCfg(
         prim_path="/World/skyLight",
@@ -214,7 +214,6 @@ class TerminationsCfg:
 @configclass
 class CurriculumsCfg:
     """Curriculums for the MDP."""
-    terrain_levels = CurrTerm(func=mdp.terrain_levels_ballu)
 
 ##
 # Environment configuration
@@ -222,7 +221,7 @@ class CurriculumsCfg:
 
 
 @configclass
-class BalluRoughEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
+class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
     """Configuration for the BALLU robot environment with indirect actuation."""
 
     # Scene settings
@@ -244,8 +243,8 @@ class BalluRoughEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (0.0, 6.0, 2.0)
-        self.viewer.lookat = (0.0, 0.0, 1.0)
+        self.viewer.eye = (1.0, 6.0, 2.0)
+        self.viewer.lookat = (1.0, 0.0, 1.0)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
@@ -269,17 +268,17 @@ class BalluRoughEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         #   if self.scene.terrain.terrain_generator is not None:
         #       self.scene.terrain.terrain_generator.curriculum = False
 
-@configclass
-class BalluRoughEnvCfg_PLAY(BalluRoughEnvCfg):
-    """Configuration for the BALLU robot environment with indirect actuation."""
+# @configclass
+# class BalluSingleObstacleEnvCfg_PLAY(BalluSingleObstacleEnvCfg):
+#     """Configuration for the BALLU robot environment with indirect actuation."""
 
-    def __post_init__(self):
-        """Post initialization."""
-        super().__post_init__()
-        self.scene.num_envs = 50
-        self.scene.env_spacing = 2.5
-        self.scene.terrain.max_init_terrain_level = None
-        self.scene.terrain.terrain_generator = BALLU_TERRAINS_CFG_PLAY
+#     def __post_init__(self):
+#         """Post initialization."""
+#         super().__post_init__()
+#         self.scene.num_envs = 50
+#         self.scene.env_spacing = 2.5
+#         self.scene.terrain.max_init_terrain_level = None
+#         self.scene.terrain.terrain_generator = BALLU_TERRAINS_CFG_PLAY
 
-        if self.scene.terrain.terrain_generator is not None:
-            self.scene.terrain.terrain_generator.curriculum = False
+#         if self.scene.terrain.terrain_generator is not None:
+#             self.scene.terrain.terrain_generator.curriculum = False

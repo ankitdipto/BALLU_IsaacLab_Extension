@@ -25,6 +25,8 @@ def forward_velocity_x(
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     Vx = torch.nan_to_num(asset.data.root_lin_vel_b[:, 0], nan=0.0)
     Vx = torch.where(Vx > 0.5, torch.zeros_like(Vx), Vx)
+    # Transform negative velocities using exponential function
+    Vx = torch.where(Vx < 0.0, torch.exp(Vx) - 1, Vx)
     # Vx = torch.clamp(Vx, min=-0.5) # This component introduced severe learning slowdown in the rough terrain environment. Better to keep it disabled unless absolutely necessary.
     return Vx
 

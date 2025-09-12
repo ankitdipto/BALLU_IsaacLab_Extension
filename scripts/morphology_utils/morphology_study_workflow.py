@@ -29,7 +29,7 @@ import time
 import json
 import shutil
 from datetime import datetime
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from pathlib import Path
 
 
@@ -41,7 +41,7 @@ class MorphologyStudyWorkflow:
     their conversion to Isaac Sim format, and automated training experiments.
     """
     
-    def __init__(self, base_dir: str = None):
+    def __init__(self, base_dir: Optional[str] = None):
         """
         Initialize the morphology study workflow.
         
@@ -342,6 +342,9 @@ class MorphologyStudyWorkflow:
             captured_output = []
             
             try:
+                # Guard for Optional stdout (type-checker)
+                if process.stdout is None:
+                    raise RuntimeError("Subprocess stdout is None; cannot stream output.")
                 for line in process.stdout:
                     print(line, end='')
                     captured_output.append(line)
@@ -392,7 +395,7 @@ class MorphologyStudyWorkflow:
     def run_training_experiment(self, usd_path: str, ratio_name: str, 
                               task: str, seed: int, max_iterations: int,
                               num_envs: int, experiment_id: str,
-                              output_dir: str, additional_args: List[str] = None) -> Dict[str, Any]:
+                              output_dir: str, additional_args: Optional[List[str]] = None) -> Dict[str, Any]:
         """
         Run a training experiment with the specified morphology.
         
@@ -471,6 +474,9 @@ class MorphologyStudyWorkflow:
             captured_output = []
             
             try:
+                # Guard for Optional stdout (type-checker)
+                if process.stdout is None:
+                    raise RuntimeError("Subprocess stdout is None; cannot stream output.")
                 for line in process.stdout:
                     print(line, end='')
                     captured_output.append(line)
@@ -520,7 +526,7 @@ class MorphologyStudyWorkflow:
     
     def run_morphology_study(self, ratios: List[str], task: str, seed: int,
                            max_iterations: int, num_envs: int,
-                           additional_args: List[str] = None, 
+                           additional_args: Optional[List[str]] = None, 
                            run_testing: bool = True) -> Dict[str, Any]:
         """
         Run the complete morphology study workflow.

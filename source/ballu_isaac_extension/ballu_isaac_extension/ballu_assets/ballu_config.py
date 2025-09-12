@@ -46,7 +46,8 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.7), 
+        pos=(0.4, 0.0, 0.7), 
+        # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
                    "HIP_RIGHT": degree_to_radian(1),

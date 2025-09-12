@@ -5,8 +5,8 @@ from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, R
 class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
-    save_interval = 100
-    experiment_name = "lab_8.19.2025"
+    save_interval = 25
+    experiment_name = "lab_9.09.2025"
     empirical_normalization = False  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
