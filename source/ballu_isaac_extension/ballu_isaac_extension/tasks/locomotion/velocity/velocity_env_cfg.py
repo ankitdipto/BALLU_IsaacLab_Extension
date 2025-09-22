@@ -287,7 +287,7 @@ class LocomotionVelocityRoughEnvCfg(ManagerBasedRLEnvCfg):
     rewards: RewardsCfg = RewardsCfg()
     terminations: TerminationsCfg = TerminationsCfg()
     events: EventCfg = EventCfg()
-    curriculum: CurriculumCfg = CurriculumCfg()
+    curriculums: CurriculumCfg = CurriculumCfg()
 
     def __post_init__(self):
         """Post initialization."""

@@ -46,28 +46,28 @@ class BALLUSceneCfg(InteractiveSceneCfg):
         ),
     )
     # obstacle - cuboid
-    obstacle = AssetBaseCfg(
-        prim_path="{ENV_REGEX_NS}/obstacle",
-        spawn=sim_utils.CuboidCfg(
-            size=(2.0, 2.0, 0.055),
-            # Make it collide and fix it in place (kinematic)
-            collision_props=sim_utils.CollisionPropertiesCfg(),
-            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-            # Use default reasonable friction/restitution
-            physics_material=sim_utils.RigidBodyMaterialCfg(),
-            # Marble-like visual material
-            visual_material=sim_utils.PreviewSurfaceCfg(
-                diffuse_color=(0.2, 0.2, 0.2),  # Light gray marble
-                roughness=0.2,  # Slightly glossy
-                metallic=0.1,  # Subtle metallic sheen
-            ),
-        ),
-        # Place so it rests on ground (height/2) and rotate 45 deg about z
-        init_state=AssetBaseCfg.InitialStateCfg(
-            pos=(2.5, 0.0, 0.0275),
-            rot=(1.0, 0.0, 0.0, 0.0),
-        ),
-    )
+    # obstacle = AssetBaseCfg(
+    #     prim_path="{ENV_REGEX_NS}/obstacle",
+    #     spawn=sim_utils.CuboidCfg(
+    #         size=(2.0, 2.0, 0.055),
+    #         # Make it collide and fix it in place (kinematic)
+    #         collision_props=sim_utils.CollisionPropertiesCfg(),
+    #         rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+    #         # Use default reasonable friction/restitution
+    #         physics_material=sim_utils.RigidBodyMaterialCfg(),
+    #         # Marble-like visual material
+    #         visual_material=sim_utils.PreviewSurfaceCfg(
+    #             diffuse_color=(0.2, 0.2, 0.2),  # Light gray marble
+    #             roughness=0.2,  # Slightly glossy
+    #             metallic=0.1,  # Subtle metallic sheen
+    #         ),
+    #     ),
+    #     # Place so it rests on ground (height/2) and rotate 45 deg about z
+    #     init_state=AssetBaseCfg.InitialStateCfg(
+    #         pos=(1.0, 0.0, 0.0),
+    #         rot=(1.0, 0.0, 0.0, 0.0),
+    #     ),
+    # )
 
     # BALLU
     robot: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
@@ -76,22 +76,25 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     # lights
     dome_light = AssetBaseCfg(
         prim_path="/World/DomeLight",
-        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1500.0),
+        spawn=sim_utils.DomeLightCfg(color=(0.9, 0.9, 0.9), intensity=1000.0),
     )
 
-    sky_light = AssetBaseCfg(
-        prim_path="/World/skyLight",
-        spawn=sim_utils.DomeLightCfg(
-            intensity=500.0,
-            texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
-        ),
-    )
+    # sky_light = AssetBaseCfg(
+    #     prim_path="/World/skyLight",
+    #     spawn=sim_utils.DomeLightCfg(
+    #         intensity=500.0,
+    #         texture_file=f"{ISAAC_NUCLEUS_DIR}/Materials/Textures/Skies/PolyHaven/kloofendal_43d_clear_puresky_4k.hdr",
+    #     ),
+    # )
 
     # contact sensors at feet
     #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
     #                                  history_length=3, 
     #                                  track_air_time=True)
 
+
+    # Generated obstacles are added as individual AssetBaseCfg entries in __post_init__
+    obstacles = None
 
 @configclass
 class ConstantVelCommandCfg:
@@ -139,6 +142,8 @@ class ObservationsCfg:
         #velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos)
         joint_vel = ObsTerm(func=mdp.joint_vel)
+        distance_to_obstacle = ObsTerm(func=mdp.distance_to_obstacle_priv)
+        height_of_obstacle = ObsTerm(func=mdp.height_of_obstacle_in_front_priv)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -162,6 +167,21 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
 
+    # Primary reward - reach the goal
+    position_tracking_l1_singleObj = RewTerm(
+        func=mdp.position_tracking_l1_singleObj,
+        weight=5.0,
+    )
+
+    # Shaping reward - jump to clear the obstacle
+    high_jump = RewTerm(
+        func=mdp.feet_z_pos_exp,
+        weight=1.0,
+        params={
+            "slope": 1.73
+        }
+    )
+
     # Reward to encourage tracking the command velocity
     track_lin_vel_xy_base_l2 = RewTerm(
         func=mdp.track_lin_vel_xy_base_l2,
@@ -172,7 +192,7 @@ class RewardsCfg:
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
-        weight=4.0,
+        weight=3.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
@@ -198,7 +218,7 @@ class RewardsCfg:
     # Penalize lateral velocity
     lateral_vel_base = RewTerm(
         func=mdp.lateral_velocity_y,
-        weight=-2.0,
+        weight=0.0,
     )
 
 @configclass
@@ -210,10 +230,15 @@ class TerminationsCfg:
     invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 10.0})
     # (3) Root height above hard limit (terminal)
     root_height_above = DoneTerm(func=mdp.root_height_above, params={"z_limit": 3.0})
+    # (4) Feet z position above hard limit (terminal)
+    feet_z_pos_above = DoneTerm(func=mdp.feet_z_pos_above, params={"z_limit": 0.8})
+
 
 @configclass
 class CurriculumsCfg:
     """Curriculums for the MDP."""
+    #obstacle_height_levels = CurrTerm(func=mdp.obstacle_height_levels)
+    obstacle_height_levels_custom = CurrTerm(func=mdp.obstacle_height_levels_same_row)
 
 ##
 # Environment configuration
@@ -254,6 +279,62 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.sim.physx.solver_type = 1 # Truncated Gauss-Seidel
         self.sim.physx.min_position_iteration_count = 1
         self.sim.physx.min_velocity_iteration_count = 1
+
+        # Place all env origins at (0, 0, 0)
+        # With physics replication enabled, environments are separated by env IDs, so overlapping origins are safe.
+        self.scene.env_spacing = 2.5e-4
+        # --- Obstacle array parameters (user-configurable) ---
+        # Number of obstacles along -y
+        obstacle_num: int = 21
+        # Obstacle base size in x and y (meters)
+        obstacle_size_x: float = 1.0
+        obstacle_size_y: float = 2.0
+        # Base height and multiplicative growth per step i: h_i = base * (1+growth)^i
+        obstacle_base_height: float = 0.010
+        obstacle_growth_delta: float = 0.020
+        # Spacing between obstacle centers along -y and x line where obstacles sit
+        obstacle_spacing_y: float = 2.0
+        obstacle_x_line: float = 1.0
+        obstacle_y_start: float = 0.0
+        # Build global obstacles as extras (not replicated per env)
+        if obstacle_num > 0:
+            base_h = float(obstacle_base_height)
+            # growth = float(obstacle_growth_fraction)
+            sx = float(obstacle_size_x)
+            sy = float(obstacle_size_y)
+            x_line = float(obstacle_x_line)
+            y0 = float(obstacle_y_start)
+            dy = float(obstacle_spacing_y)
+
+            for i in range(int(obstacle_num)):
+                # height_i = base_h * ((1.0 + growth) ** i)
+                height_i = base_h + i * obstacle_growth_delta
+                pos_i = (x_line, y0 - i * dy, height_i / 2.0)
+                name = f"obstacle_{i}"
+                setattr(
+                    self.scene,
+                    name,
+                    AssetBaseCfg(
+                        prim_path=f"/World/{name}",
+                        collision_group=-1,
+                        spawn=sim_utils.CuboidCfg(
+                            size=(sx, sy, height_i),
+                            collision_props=sim_utils.CollisionPropertiesCfg(),
+                            rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
+                            physics_material=sim_utils.RigidBodyMaterialCfg(),
+                            visual_material=sim_utils.PreviewSurfaceCfg(
+                                diffuse_color=(0.2, 0.2, 0.2),
+                                roughness=0.2,
+                                metallic=0.1,
+                            ),
+                        ),
+                        init_state=AssetBaseCfg.InitialStateCfg(
+                            pos=pos_i,
+                            rot=(1.0, 0.0, 0.0, 0.0),
+                        ),
+                    ),
+                )
+                self.obstacle_height_list.append(height_i)
 
         # check if terrain levels curriculum is enabled - if so, enable curriculum for terrain generator
         # this generates terrains with increasing difficulty and is useful for training

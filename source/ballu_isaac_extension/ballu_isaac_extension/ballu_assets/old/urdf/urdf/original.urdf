@@ -146,7 +146,7 @@ http://wiki.ros.org/sw_urdf_exporter -->
   <link name="BALLOON">
     <inertial>
       <origin xyz="-0.00006 -0.37953 0" rpy="0 0 0"/>
-      <mass value="0.15898"/>
+      <mass value="0.15898"/> <!-- If helium was used then the mass would be = pi * r^2 * h * density_helium = pi * 0.32^2 * 0.7 * 0.1785 = 0.040196 Kg = 40.196 g-->
       <inertia ixx="1.421434E-02" iyy="1.025578E-02" izz="1.420794E-02" ixy="-3.811700E-06" ixz="0.000000E+00" iyz="0.000000E+00"/>
     </inertial>
     <visual>

@@ -36,7 +36,9 @@ do
                                        --common_folder "$COMMON_FOLDER_WITH_TIMESTAMP" \
                                        --seed "$SEED" \
                                        --headless \
-                                       --max_iterations "$MAX_ITERATIONS"
+                                       --max_iterations "$MAX_ITERATIONS" \
+                                       agent.algorithm.mirror_symmetry_cfg.weight=0.1 \
+                                       --device cuda:0
 
         echo "Testing with seed: $SEED on final model"
         python scripts/rsl_rl/play.py --task "$TASK" \
@@ -45,7 +47,8 @@ do
                                      --headless \
                                      --video \
                                      --num_envs 1 \
-                                     --video_length 399
+                                     --video_length 399 \
+                                     --device cuda:0
         
         echo "Testing with seed: $SEED on best model"
         python scripts/rsl_rl/play.py --task "$TASK" \
@@ -54,7 +57,8 @@ do
                                      --headless \
                                      --video \
                                      --num_envs 1 \
-                                     --video_length 399
+                                     --video_length 399 \
+                                     --device cuda:0
                                      
         # Check if play script succeeded
         # if [ $? -ne 0 ]; then

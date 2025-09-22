@@ -25,6 +25,8 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Tutorial on running the cartpole RL environment.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 parser.add_argument("--buoyancy_offset", type=float, nargs=3, help="Buoyancy offset.")
+parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, help="Gravity compensation ratio.")
+
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
 # parse the arguments
@@ -45,6 +47,9 @@ from ballu_isaac_extension.tasks.ballu_locomotion.rough_env_cfg import BalluRoug
 from ballu_isaac_extension.tasks.ballu_locomotion.single_obstacle_env_cfg import BalluSingleObstacleEnvCfg
 from action_generators import *
 import os
+import isaaclab.sim as sim_utils
+import omni.usd
+from pxr import Usd, UsdGeom, Gf
 #from ..rsl_rl.plotters import plot_root_com_xy
 
 def plot_root_com_xy(root_com_xyz_hist_tch, num_envs, save_dir):
@@ -87,15 +92,15 @@ def main():
     """Main function."""
     # create environment configuration
     # env_cfg = BalluRoughEnvCfg()
-    # env_cfg = BalluFlatEnvCfg()
-    env_cfg = BalluSingleObstacleEnvCfg()
+    env_cfg = BalluFlatEnvCfg()
+    # env_cfg = BalluSingleObstacleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
     #env_cfg.scene.robot.spawn.usd_path = \
     #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
     #buoyancy_offset = [float(x) for x in args_cli.buoyancy_offset]
     print("buoyancy_offset: ", args_cli.buoyancy_offset)
     # setup RL environment
-    env = ManagerBasedRLEnv(cfg=env_cfg) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
+    env = ManagerBasedRLEnv(cfg=env_cfg, gravity_compensation_ratio=args_cli.gravity_compensation_ratio) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
     
     # print environment information
     print(f"\n=== ENVIRONMENT INFO ===")
@@ -123,16 +128,35 @@ def main():
     left_tibia_idx = left_tibia_ids[0]
     right_tibia_idx = right_tibia_ids[0]
     tibia_endpoints_world_history = []  # list of tensors shape (num_envs, 2, 3) per step [left,right]
+    tibia_startpoints_world_history = []  # list of tensors shape (num_envs, 2, 3) per step [left,right]
     count = 0
     cum_rewards = 0
     while simulation_app.is_running():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            actions = stepper(count, period = 60, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
-            # if count % 400 <= 150:
+            #actions = both_legs_0(num_envs=args_cli.num_envs)
+
+            # if count % env.max_episode_length <= 150:
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
+            # else:
+            #     actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            # ---- Best action sequence for jumping ----
+            # if count % 140 <= 80:
+            #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
+            # elif count % 140 <= 85:
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
+            # else:
+            #     actions = both_legs_1(num_envs = args_cli.num_envs)
+
+            # if count % 200 <= 90:
+            #     actions = both_legs_theta(theta=0.8, num_envs=args_cli.num_envs)
+            # else:
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
+            # if count % 140 <= 80:
             #     actions = both_legs_0(num_envs=args_cli.num_envs)
             # else:
             #     actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
@@ -161,6 +185,7 @@ def main():
             rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
             tibia_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
             tibia_endpoints_world_history.append(tibia_endpoints_w.detach().cpu())
+            tibia_startpoints_world_history.append(tibia_pos_w.detach().cpu())
             #env_idx = 0
             #neck_joint_pos = robots.data.joint_pos[env_idx, neck_indices]
             #neck_joint_pos_history.append(neck_joint_pos.item())
@@ -174,11 +199,56 @@ def main():
             torque_history.append(torques_applied_on_knees.detach().cpu())
             cum_rewards += rew
             count += 1
-            # if count == 400:
-            #     break
+            # if count == env.max_episode_length:
+            #    break
             # if terminated.any() or truncated.any():
             #     print(f"[INFO]: Environments terminated after {count} steps.")
             #     break
+            # Print obstacle size (world-space) once using raw USD API
+            if count == 1:
+                try:
+                    obstacle_asset = env.unwrapped.scene["obstacle"]
+                    stage = omni.usd.get_context().get_stage()
+                    prim_path_env0 = None
+                    # Try multiple ways to resolve the prim path
+                    try:
+                        if hasattr(obstacle_asset, "cfg") and hasattr(obstacle_asset.cfg, "prim_path"):
+                            prim_paths = sim_utils.find_matching_prim_paths(obstacle_asset.cfg.prim_path)
+                            if len(prim_paths) > 0:
+                                prim_path_env0 = prim_paths[0]
+                    except Exception:
+                        pass
+                    if prim_path_env0 is None and hasattr(obstacle_asset, "prim_path"):
+                        prim_path_env0 = obstacle_asset.prim_path
+                        print("obstacle has prim path")
+                    if prim_path_env0 is None and hasattr(obstacle_asset, "prim"):
+                        prim_path_env0 = obstacle_asset.prim.GetPath().pathString
+                        print("obstacle has prim")
+                    if prim_path_env0 is None:
+                        # Fallback: search under /World for prims named "obstacle" and take the first (env 0)
+                        prims = sim_utils.get_all_matching_child_prims("/World", predicate=lambda p: p.GetName() == "obstacle")
+                        if len(prims) > 0:
+                            prim_path_env0 = prims[0].GetPath().pathString
+                            print("obstacle has array of prims")
+                    if prim_path_env0 is None:
+                        print("[WARN] Could not resolve obstacle prim path.")
+                    else:
+                        prim = stage.GetPrimAtPath(prim_path_env0)
+                        bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render], False)
+                        world_bbox = bbox_cache.ComputeWorldBound(prim)
+                        aligned_box = world_bbox.ComputeAlignedBox()
+                        min_pt = aligned_box.GetMin()
+                        max_pt = aligned_box.GetMax()
+                        size_x = max_pt[0] - min_pt[0]
+                        size_y = max_pt[1] - min_pt[1]
+                        size_z = max_pt[2] - min_pt[2]
+                        print(f"[INFO] Obstacle world size (X,Y,Z) for env 0 at {prim_path_env0}: ({size_x:.4f}, {size_y:.4f}, {size_z:.4f})")
+                except Exception as e:
+                    print(f"[WARN] Failed to query obstacle size via USD: {e}")
+                print("Obstacle height list: ", env.unwrapped.obstacle_height_list)
+            # if count % env.max_episode_length == 0:
+            #     env.unwrapped.scene._default_env_origins = torch.rand(env.unwrapped.num_envs, 3, device=env.device) * 6.0
+            #     env.unwrapped.scene._default_env_origins[:, 2] = 0.7
 
     # close the environment
     env.close()
@@ -191,6 +261,8 @@ def main():
     print("base_vel_std: ", base_vel_std)
 
     print("Shape of base_speed_history: ", base_speed_history.shape)
+
+    results_dir = "logs/results/manual_run"
     # Plot base speed components
     plt.figure(figsize=(10, 6))
     timesteps = base_speed_history.shape[0]
@@ -206,7 +278,7 @@ def main():
     plt.xlabel('Timesteps')
     plt.suptitle('Base Speed Components Over Time')
     plt.tight_layout()
-    plt.savefig('base_speed_components_1.png')
+    plt.savefig(os.path.join(results_dir, 'base_speed_components_jump.png'))
     plt.close()
     
     torque_history = torch.stack(torque_history)
@@ -217,14 +289,14 @@ def main():
     
     for i in range(2):
         plt.subplot(2, 1, i+1)
-        plt.plot(range(timesteps), torque_history[:, 0, i], color=colors[i])
+        plt.plot(range(timesteps), torque_history[:, 0, i], color=colors[i], alpha=0.67)
         plt.ylabel(f'{components[i]} Torque (Nm)')
         plt.grid(True)
     
     plt.xlabel('Timesteps')
     plt.suptitle('Torque Applied on Knees Over Time')
     plt.tight_layout()
-    plt.savefig('knee_torque_1.png')
+    plt.savefig(os.path.join(results_dir, 'knee_torque_jump.png'))
     plt.close()
 
     # Summarize tibia endpoint tracking
@@ -245,8 +317,21 @@ def main():
         plt.ylabel('Toe Z pos (m)')
         plt.legend()
         plt.grid(True)
-        plt.savefig('toe_z_pos_1obstacle.png')
+        plt.savefig(os.path.join(results_dir, 'toe_z_pos_jump.png'))
         plt.close()
+
+    if len(tibia_startpoints_world_history) > 0:
+        tibia_startpoints_world_history = torch.stack(tibia_startpoints_world_history)  # (T, num_envs, 2, 3)
+        plt.figure(figsize=(10, 6))
+        plt.plot(range(timesteps), tibia_startpoints_world_history[:, 0, 0, 2], label='Left knee Z pos')
+        plt.plot(range(timesteps), tibia_startpoints_world_history[:, 0, 1, 2], label='Right knee Z pos')
+        plt.xlabel('Timesteps')
+        plt.ylabel('Knee Z pos (m)')    
+        plt.legend()
+        plt.grid(True)
+        plt.savefig(os.path.join(results_dir, 'knee_z_pos_jump.png'))
+        plt.close()
+    
     #neck_joint_pos_history = np.array(neck_joint_pos_history)
     #print("neck_joint_pos_history: ", neck_joint_pos_history)
     # with open("neck_joint_pos_history.jsonl", "a") as f:

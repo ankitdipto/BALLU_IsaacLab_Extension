@@ -223,10 +223,23 @@ class RewardsCfg:
             }
     )
 
+    feet_z_pos = RewTerm(
+        func=mdp.feet_z_pos,
+        weight=0.0,
+    )
+
+    feet_z_pos_exp = RewTerm(
+        func=mdp.feet_z_pos_exp,
+        weight=0.0,
+        params={
+            "slope": 1.73
+        }
+    )
+
     # Penalize lateral velocity
     lateral_vel_base = RewTerm(
         func=mdp.lateral_velocity_y,
-        weight=-2.0,
+        weight=0.0,
     )
     # Penalty to enforce joint actions are within bounds
     # joint_torques_out_of_bounds = RewTerm(
@@ -325,7 +338,8 @@ class TerminationsCfg:
     invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 10.0})
     # (3) Root height above hard limit (terminal)
     root_height_above = DoneTerm(func=mdp.root_height_above, params={"z_limit": 3.0})
-
+    # (4) Feet z position above hard limit (terminal)
+    feet_z_pos_above = DoneTerm(func=mdp.feet_z_pos_above, params={"z_limit": 0.76})
 ##
 # Environment configuration
 ##

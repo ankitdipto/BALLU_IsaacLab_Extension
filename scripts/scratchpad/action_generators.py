@@ -29,9 +29,9 @@ def stepper(step_count, period=200, num_envs=1):
     """
     actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
     if step_count % period < period / 2:
-        actions[:, 0] = 1.0
+        actions[:, 0] = 0.8
     else:
-        actions[:, 1] = 1.0
+        actions[:, 1] = 0.8
     return actions
 
 def bang_bang_control(step_count, num_envs=1):
@@ -76,6 +76,13 @@ def both_legs_1(num_envs=1):
     Both legs 1 controller for joint actuation.
     """
     actions = torch.full((num_envs, 2), 1.0, device="cuda:0")
+    return actions
+
+def both_legs_theta(theta,num_envs=1):
+    """
+    Both legs theta controller for joint actuation.
+    """
+    actions = torch.full((num_envs, 2), theta, device="cuda:0")
     return actions
 
 def override_link_masses_with_randomizer(env, link_name, mass_range, operation="abs"):

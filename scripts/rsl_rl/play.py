@@ -283,8 +283,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         #    break
 
     # Before closing the simulator evaluate the performance
-    successes, local_positions = threshold_based_verification(env.unwrapped)
-    success_rate = successes.float().mean().item()
+    # successes, local_positions = threshold_based_verification(env.unwrapped)
+    # success_rate = successes.float().mean().item()
     # close the simulator (Very very important)
     env.close()
 
@@ -308,7 +308,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)
     # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, play_folder)
-    plot_local_positions_scatter(local_positions, play_folder, threshold_x=1.7, success_rate=success_rate)
+    # plot_local_positions_scatter(local_positions, play_folder, threshold_x=1.7, success_rate=success_rate)
     # Save data to CSV file for env_idx=0
     env_idx = 0
     
@@ -356,7 +356,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print("base_vel_mean of RL policy: ", base_vel_mean)
     print("base_vel_std of RL policy: ", base_vel_std)
     print("cumulative rewards of RL policy: ", cum_rewards)
-    print("success rate of RL policy: ", success_rate)
+    # print("success rate of RL policy: ", success_rate)
 
 if __name__ == "__main__":
     # run the main function

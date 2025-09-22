@@ -1,5 +1,6 @@
 import torch
 from isaaclab.envs import ManagerBasedRLEnv
+import isaaclab.utils.math as math_utils
 
 
 def invalid_state(env: ManagerBasedRLEnv, max_root_speed: float = 10.0) -> torch.Tensor:
@@ -54,3 +55,28 @@ def root_height_above(env: ManagerBasedRLEnv, z_limit: float = 3.0) -> torch.Ten
     """
     robot = env.scene["robot"]
     return robot.data.root_pos_w[:, 2] > z_limit
+
+def feet_z_pos_above(env: ManagerBasedRLEnv, z_limit: float = 1.5) -> torch.Tensor:
+    """Terminate when the feet z position exceeds the given limit."""
+    asset = env.scene["robot"]
+    tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
+    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
+    tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
+    feet_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], 
+                                device=env.device, dtype=tibia_pos_w.dtype)
+    feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
+    pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+    feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
+    feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
+    min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
+    # print("min_feet_z_pos_w: ", min_feet_z_pos_w)
+    return min_feet_z_pos_w > z_limit
+
+def robot_crosses_env_boundary(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Terminate when the robot crosses the env boundary."""
+    env_origins = env.scene.env_origins
+    robot = env.scene["robot"]
+    inter_env_spacing_y = 2.0
+    # Check if robot is outside [env_origin_y - inter_env_spacing_y / 2, env_origin_y + inter_env_spacing_y / 2]
+    robot_pos_w_y = robot.data.root_pos_w[:, 1]
+    return torch.logical_or(robot_pos_w_y < env_origins[:, 1] - inter_env_spacing_y / 2, robot_pos_w_y > env_origins[:, 1] + inter_env_spacing_y / 2)
