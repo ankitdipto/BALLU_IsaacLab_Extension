@@ -68,6 +68,7 @@ do
         
 done
 
+# python scripts/rsl_rl/train.py --task Isc-Vel-BALLU-1-obstacle --num_envs 4096 --run_name "1_obstacle_crclm_frwdVel3.0_jump1.0_eplen500_Hzn40_rewChgEnd600_seed0" --seed 0 --headless --max_iterations 5000 --device cuda:0
 # COMMON_FOLDER_WITH_TIMESTAMP="${TIMESTAMP}_rewStd_0.45_symWt_0.1_velC"
 
 

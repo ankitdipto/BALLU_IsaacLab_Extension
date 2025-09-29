@@ -349,7 +349,7 @@ def plot_toe_heights(tibia_endpoints_hist_tch, num_envs, save_dir):
     print(f"[INFO] Saved toe heights plot to {plot_path}")
 
 
-def plot_local_positions_scatter(local_positions_tch, save_dir, threshold_x=1.7, success_rate: float | None = None):
+def plot_local_positions_scatter(local_positions_tch, save_dir, threshold_x=1.0, success_rate: float | None = None):
     """Scatter plot of final local positions (X vs Y) for all environments.
     
     Args:
@@ -371,6 +371,7 @@ def plot_local_positions_scatter(local_positions_tch, save_dir, threshold_x=1.7,
 
     ax = plt.gca()
     ax.set_aspect('equal', adjustable='box')
+    # ax.invert_xaxis()  # Flip x-axis so +x is on the left side
     plt.xlabel('Local X (m)')
     plt.ylabel('Local Y (m)')
     title = 'Final Local Positions (XY)'

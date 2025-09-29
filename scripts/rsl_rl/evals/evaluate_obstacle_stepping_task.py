@@ -32,7 +32,7 @@ def threshold_based_verification(
         - final_world_positions: torch.FloatTensor of shape (num_envs, 3)
     """
     # Access robot articulation and positions
-    robot: "Articulation" = env.scene[asset_cfg.name]
+    robot: Articulation = env.scene[asset_cfg.name]
     final_world_positions: torch.Tensor = robot.data.root_pos_w  # (num_envs, 3)
 
     # Convert to local/env-relative coordinates

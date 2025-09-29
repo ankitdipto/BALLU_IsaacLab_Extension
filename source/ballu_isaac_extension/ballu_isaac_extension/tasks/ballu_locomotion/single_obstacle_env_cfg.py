@@ -176,7 +176,7 @@ class RewardsCfg:
     # Shaping reward - jump to clear the obstacle
     high_jump = RewTerm(
         func=mdp.feet_z_pos_exp,
-        weight=1.0,
+        weight=2.0,
         params={
             "slope": 1.73
         }
@@ -266,10 +266,10 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         """Post initialization."""
         # general settings
         self.decimation = 10 #8
-        self.episode_length_s = 20
+        self.episode_length_s = 30
         # viewer settings
-        self.viewer.eye = (1.0, 6.0, 2.0)
-        self.viewer.lookat = (1.0, 0.0, 1.0)
+        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 2.0 * 10, 2.0)
+        self.viewer.lookat = (1.0, 0.0 - 2.0 * 10, 1.0)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0

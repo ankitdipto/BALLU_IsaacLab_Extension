@@ -92,8 +92,8 @@ def main():
     """Main function."""
     # create environment configuration
     # env_cfg = BalluRoughEnvCfg()
-    env_cfg = BalluFlatEnvCfg()
-    # env_cfg = BalluSingleObstacleEnvCfg()
+    # env_cfg = BalluFlatEnvCfg()
+    env_cfg = BalluSingleObstacleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
     #env_cfg.scene.robot.spawn.usd_path = \
     #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
@@ -135,10 +135,10 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            actions = stepper(count, period = 60, num_envs=args_cli.num_envs)
+            #actions = stepper(count, period = 60, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
-            #actions = both_legs_0(num_envs=args_cli.num_envs)
+            actions = both_legs_0(num_envs=args_cli.num_envs)
 
             # if count % env.max_episode_length <= 150:
             #     actions = both_legs_0(num_envs=args_cli.num_envs)
