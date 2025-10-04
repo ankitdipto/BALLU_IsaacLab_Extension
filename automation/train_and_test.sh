@@ -28,37 +28,38 @@ COMMON_FOLDER_WITH_TIMESTAMP="${TIMESTAMP}_${COMMON_FOLDER}"
 echo "Starting training for task: $TASK"
 echo "Using common folder with timestamp: $COMMON_FOLDER_WITH_TIMESTAMP"
 
-for SEED in "$@"
+# for SEED in "$@"
+for fl_ratio in "$@"
 do
-        echo "Training with seed: $SEED"
+        echo "Training with fl_ratio: $fl_ratio"
         python scripts/rsl_rl/train.py --task "$TASK" \
                                        --num_envs 4096 \
-                                       --common_folder "$COMMON_FOLDER_WITH_TIMESTAMP" \
-                                       --seed "$SEED" \
+                                       --run_name "1-obstacle_fl_ratio_seed44_$fl_ratio" \
+                                       --fl_ratio "$fl_ratio" \
                                        --headless \
-                                       --max_iterations "$MAX_ITERATIONS" \
-                                       agent.algorithm.mirror_symmetry_cfg.weight=0.1 \
-                                       --device cuda:0
+                                       --seed 44 \
+                                       --max_iterations "$MAX_ITERATIONS"
+                                       # --common_folder "$COMMON_FOLDER_WITH_TIMESTAMP" \
 
-        echo "Testing with seed: $SEED on final model"
-        python scripts/rsl_rl/play.py --task "$TASK" \
-                                     --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
-                                     --checkpoint "model_$((MAX_ITERATIONS - 1)).pt" \
-                                     --headless \
-                                     --video \
-                                     --num_envs 1 \
-                                     --video_length 399 \
-                                     --device cuda:0
+        # echo "Testing with seed: $SEED on final model"
+        # python scripts/rsl_rl/play.py --task "$TASK" \
+        #                              --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
+        #                              --checkpoint "model_$((MAX_ITERATIONS - 1)).pt" \
+        #                              --headless \
+        #                              --video \
+        #                              --num_envs 1 \
+        #                              --video_length 399 \
+        #                              --device cuda:0
         
-        echo "Testing with seed: $SEED on best model"
-        python scripts/rsl_rl/play.py --task "$TASK" \
-                                     --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
-                                     --checkpoint "model_best.pt" \
-                                     --headless \
-                                     --video \
-                                     --num_envs 1 \
-                                     --video_length 399 \
-                                     --device cuda:0
+        # echo "Testing with seed: $SEED on best model"
+        # python scripts/rsl_rl/play.py --task "$TASK" \
+        #                              --load_run "$COMMON_FOLDER_WITH_TIMESTAMP/seed_$SEED" \
+        #                              --checkpoint "model_best.pt" \
+        #                              --headless \
+        #                              --video \
+        #                              --num_envs 1 \
+        #                              --video_length 399 \
+        #                              --device cuda:0
                                      
         # Check if play script succeeded
         # if [ $? -ne 0 ]; then
