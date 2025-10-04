@@ -189,6 +189,11 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
+    # Position tracking reward
+    position_tracking_l1_singleObj = RewTerm(
+        func=mdp.position_tracking_l1_singleObj,
+        weight=0.0,
+    )
 
     # Reward to encourage tracking the command velocity
     track_lin_vel_xy_base_l2 = RewTerm(
@@ -228,7 +233,7 @@ class RewardsCfg:
         weight=0.0,
     )
 
-    feet_z_pos_exp = RewTerm(
+    high_jump = RewTerm(
         func=mdp.feet_z_pos_exp,
         weight=0.0,
         params={
