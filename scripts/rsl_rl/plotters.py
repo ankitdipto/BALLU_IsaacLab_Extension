@@ -366,14 +366,15 @@ def plot_local_positions_scatter(local_positions_tch, save_dir, threshold_x=1.0,
     y = lp[:, 1]
 
     plt.figure(figsize=(8, 8))
-    plt.scatter(x, y, c="#1f77b4", alpha=0.85, edgecolors="k", linewidths=0.5, label="Env final pos")
-    plt.axvline(threshold_x, color="#d62728", linestyle="--", linewidth=2.0, label=f"x = {threshold_x} m")
+    plt.scatter(-y, x, c="#1f77b4", alpha=0.85, edgecolors="k", linewidths=0.5, label="Env final pos")
+    plt.axhline(threshold_x, color="#d62728", linestyle="--", linewidth=2.0, label=f"x = {threshold_x} m")
 
-    ax = plt.gca()
-    ax.set_aspect('equal', adjustable='box')
+    # ax = plt.gca()
+    # ax.set_aspect('equal', adjustable='box')
     # ax.invert_xaxis()  # Flip x-axis so +x is on the left side
-    plt.xlabel('Local X (m)')
-    plt.ylabel('Local Y (m)')
+    plt.xlabel('Local Y (m)')
+    plt.ylabel('Local X (m)')
+    plt.ylim(-1.0, 2.3)
     title = 'Final Local Positions (XY)'
     if success_rate is not None:
         title += f'  |  Success Rate: {success_rate:.2%}'
