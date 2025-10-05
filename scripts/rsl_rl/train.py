@@ -31,8 +31,10 @@ parser.add_argument("--common_folder", type=str, default=None,
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
 parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
-parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
+parser.add_argument("--balloon_buoyancy_mass", type=float, default=None, 
                    help="Buoyancy mass of the balloon")
+parser.add_argument("--fl_ratio", type=float, default=0.5, 
+                   help="Ratio of femur length to total leg length")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -187,7 +189,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
 
 if __name__ == "__main__":
-    # run the main function
-    main()
-    # close sim app
-    simulation_app.close()
+    try:
+        # run the main function
+        main()
+    except Exception as e:
+        print(f"This run failed with error: {e}")
+    finally:
+        # close sim app
+        simulation_app.close()

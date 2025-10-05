@@ -40,3 +40,5 @@ _build
 **/robots/FT*
 *.png
 *rewards*.csv
+**/morphologies/**
+**/morphology/*_SUMMARY.md

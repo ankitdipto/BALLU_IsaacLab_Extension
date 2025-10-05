@@ -23,7 +23,7 @@ parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
 parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
                    help="Buoyancy mass of the balloon")
-parser.add_argument("-dl", "--difficulty_level", type=int, default=0, help="Difficulty level of the obstacle.")
+parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -126,15 +126,31 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     isaac_env = env.unwrapped
     print("Isaac environment: ", isaac_env)
     inter_obstacle_spacing_y = -2.0
+
+    if args_cli.difficulty_level == -1 and agent_cfg.load_checkpoint == "model_best.pt":
+        ckpt_dict = torch.load(checkpoint_path)
+        args_cli.difficulty_level = ckpt_dict["best_crclm_level"]
+    
+    print(f"[INFO] Difficulty level: {args_cli.difficulty_level}")
     isaac_env.scene._default_env_origins = isaac_env.scene._default_env_origins + \
         torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * args_cli.difficulty_level
 
-    # Shifting the camera position and target as per the difficulty level
-    # isaac_env.viewer.eye = isaac_env.viewer.eye + \
-    #     torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * args_cli.difficulty_level
-    # isaac_env.viewer.lookat = isaac_env.viewer.lookat + \
-    #     torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * args_cli.difficulty_level
+    EYE = (
+        1.0 - 5.5/1.414, 
+        5.5/1.414 + inter_obstacle_spacing_y * (args_cli.difficulty_level - 1), 
+        2.0
+    )
+    LOOKAT = (
+        1.0,
+        inter_obstacle_spacing_y * (args_cli.difficulty_level - 1),
+        1.0
+    )
 
+    isaac_env.viewport_camera_controller._cfg.eye = EYE
+    isaac_env.viewport_camera_controller._cfg.lookat = LOOKAT
+    
+    print(f"[DEBUG] Camera eye: {isaac_env.viewport_camera_controller._cfg.eye}")
+    print(f"[DEBUG] Camera lookat: {isaac_env.viewport_camera_controller._cfg.lookat}")
     # wrap for video recording
     
     if args_cli.video:

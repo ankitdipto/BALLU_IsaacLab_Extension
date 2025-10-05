@@ -15,13 +15,15 @@ def degree_to_radian(degree):
 def get_robot_usd_path():
     """Get robot USD path, with support for morphology override via environment variable."""
     # Check for morphology override environment variable
-    morphology_usd_path = os.environ.get('BALLU_MORPHOLOGY_USD_PATH')
-    if morphology_usd_path and os.path.exists(morphology_usd_path):
+    morphology_usd_rel_path = os.environ.get('BALLU_USD_REL_PATH')
+    print(f"ENV variable received: {morphology_usd_rel_path}")
+    if morphology_usd_rel_path:
+        morphology_usd_path = os.path.join(root_usd_path, morphology_usd_rel_path)
         print(f"🤖 Using morphology override USD: {morphology_usd_path}")
         return morphology_usd_path
     else:
         # Default to original robot
-        default_path = os.path.join(root_usd_path, "original", "original.usd")
+        default_path = os.path.join(root_usd_path, "original", "original")
         print(f"🤖 Using default robot USD: {default_path}")
         return default_path
 

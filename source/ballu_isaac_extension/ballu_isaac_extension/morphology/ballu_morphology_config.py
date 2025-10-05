@@ -89,6 +89,14 @@ class GeometryParams:
         total_length = self.get_total_leg_length()
         return self.femur_length / total_length if total_length > 0 else 0.0
 
+@dataclass
+class VisualParams:
+    """Visual parameters for BALLU morphology."""
+    femur_density: float = 1 / 0.36501
+    tibia_density: float = 1 / 0.38485
+    pelvis_density: float = 1 / 0.15
+    balloon_density: float = 1 / 0.7
+    motorarm_density: float = 1 / 0.012
 
 @dataclass
 class MassParams:
@@ -184,6 +192,7 @@ class BalluMorphology:
     geometry: GeometryParams = field(default_factory=GeometryParams)
     joints: JointParams = field(default_factory=JointParams)
     contact: ContactParams = field(default_factory=ContactParams)
+    visual: VisualParams = field(default_factory=VisualParams)
     
     # Computed properties (not part of constructor)
     mass: MassParams = field(init=False)
@@ -230,7 +239,8 @@ class BalluMorphology:
         geometry_data = data.get("geometry", {})
         joints_data = data.get("joints", {})
         contact_data = data.get("contact", {})
-        
+        visual_data = data.get("visual", {})
+
         # Mass is not loaded from the dictionary; it will be recomputed.
         return cls(
             morphology_id=data.get("morphology_id", "unknown"),
@@ -238,6 +248,7 @@ class BalluMorphology:
             geometry=GeometryParams(**geometry_data),
             joints=JointParams(**joints_data),
             contact=ContactParams(**contact_data),
+            visual=VisualParams(**visual_data),
             metadata=data.get("metadata", {})
         )
     

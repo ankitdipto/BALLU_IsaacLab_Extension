@@ -310,7 +310,7 @@ class BalluRobotGenerator:
         inertia_elem.set("ixz", f"{inertia.ixz:.6e}")
         inertia_elem.set("iyz", f"{inertia.iyz:.6e}")
     
-    def _create_visual_mesh(self, parent: ET.Element, mesh_name: str, material_name: str):
+    def _create_visual_mesh(self, parent: ET.Element, mesh_name: str, material_name: str, scale_y: float = 1.0):
         """Add visual element with mesh geometry."""
         visual = ET.SubElement(parent, "visual")
         
@@ -321,6 +321,7 @@ class BalluRobotGenerator:
         geometry = ET.SubElement(visual, "geometry")
         mesh = ET.SubElement(geometry, "mesh")
         mesh.set("filename", f"{self.mesh_package}/{mesh_name}.STL")
+        mesh.set("scale", f"1.0 {scale_y:.6f} 1.0")
         
         material = ET.SubElement(visual, "material")
         material.set("name", material_name)
@@ -512,7 +513,8 @@ Description: {1}
         
         # Visual
         if self.use_visual_meshes:
-            self._create_visual_mesh(link, "PELVIS", "color_pelvis")
+            scale_y = self.morph.visual.pelvis_density * self.morph.geometry.pelvis_height
+            self._create_visual_mesh(link, "PELVIS", "color_pelvis", scale_y)
         else:
             self._create_visual_primitive(
                 link, "cylinder", "color_pelvis",
@@ -542,8 +544,9 @@ Description: {1}
             
             # Visual
             if self.use_visual_meshes:
+                scale_y = self.morph.visual.femur_density * self.morph.geometry.femur_length
                 material = "color_femur_left" if side == "LEFT" else "color_femur_right"
-                self._create_visual_mesh(link, f"FEMUR_{side}", material)
+                self._create_visual_mesh(link, f"FEMUR_{side}", material, scale_y)
             else:
                 material = "color_femur_left" if side == "LEFT" else "color_femur_right"
                 self._create_visual_primitive(
@@ -574,8 +577,9 @@ Description: {1}
             
             # Visual
             if self.use_visual_meshes:
+                scale_y = self.morph.visual.tibia_density * self.morph.geometry.tibia_length
                 material = "color_tibia_left" if side == "LEFT" else "color_tibia_right"
-                self._create_visual_mesh(link, f"TIBIA_{side}", material)
+                self._create_visual_mesh(link, f"TIBIA_{side}", material, scale_y)
             else:
                 material = "color_tibia_left" if side == "LEFT" else "color_tibia_right"
                 self._create_visual_primitive(
@@ -614,7 +618,8 @@ Description: {1}
             
             # Visual
             if self.use_visual_meshes:
-                self._create_visual_mesh(link, f"MOTORARM_{side}", "color_motorarm")
+                scale_y = self.morph.visual.motorarm_density * self.morph.geometry.motorarm_length
+                self._create_visual_mesh(link, f"MOTORARM_{side}", "color_motorarm", scale_y)
             else:
                 self._create_visual_primitive(
                     link, "box", "color_motorarm",
@@ -645,7 +650,8 @@ Description: {1}
         
         # Visual
         if self.use_visual_meshes:
-            self._create_visual_mesh(link, "BALLOON", "color_balloons")
+            scale_y = self.morph.visual.balloon_density * self.morph.geometry.balloon_height
+            self._create_visual_mesh(link, "BALLOON", "color_balloons", scale_y)
         else:
             self._create_visual_primitive(
                 link, "cylinder", "color_balloons",
@@ -823,7 +829,7 @@ Description: {1}
         reparsed = minidom.parseString(rough_string)
         return reparsed.toprettyxml(indent="  ")
 
-    def generate_usd(self, urdf_file_path: str) -> int:
+    def generate_usd(self, urdf_file_path: str) -> tuple[int, str]:
         """
         Generate complete USD file.
         """
@@ -871,7 +877,7 @@ Description: {1}
             process.wait()
             raise subprocess.TimeoutExpired(cmd)
 
-        return process.returncode
+        return process.returncode, usd_file_path
 
 
 __all__ = [

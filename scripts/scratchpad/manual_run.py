@@ -50,6 +50,8 @@ import os
 import isaaclab.sim as sim_utils
 import omni.usd
 from pxr import Usd, UsdGeom, Gf
+
+from ballu_isaac_extension.morphology.modifiers import BalluMorphologyModifier
 #from ..rsl_rl.plotters import plot_root_com_xy
 
 def plot_root_com_xy(root_com_xyz_hist_tch, num_envs, save_dir):
@@ -92,9 +94,17 @@ def main():
     """Main function."""
     # create environment configuration
     # env_cfg = BalluRoughEnvCfg()
-    # env_cfg = BalluFlatEnvCfg()
-    env_cfg = BalluSingleObstacleEnvCfg()
+    # modifier = BalluMorphologyModifier()
+    # modifier.adjust_femur_to_limb_ratio(0.7)
+    # modifier.convert_to_usd()
+    # print("Morphology name: ", modifier.morphology_name)
+    # os.environ['BALLU_PATH'] = f"{modifier.morphology_name}/{modifier.morphology_name}.usd"
+
+    env_cfg = BalluFlatEnvCfg()
+    # env_cfg = BalluSingleObstacleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
+    env_cfg.scene.robot.init_state.pos = (0.0, 0.0, 1.0)
+    # env_cfg.scene.robot.spawn.usd_path = f"{modifier.usd_root_dir}/{modifier.morphology_name}/{modifier.morphology_name}.usd"
     #env_cfg.scene.robot.spawn.usd_path = \
     #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
     #buoyancy_offset = [float(x) for x in args_cli.buoyancy_offset]
@@ -114,6 +124,8 @@ def main():
     print(f"\n=== ROBOT INFO ===")
     print(f"Robot body names: {robots.body_names}")
     print(f"Robot joint names: {robots.joint_names}")
+
+    print("Viewer object: ", env.viewport_camera_controller.__dict__)
     
     # simulate physics
     # Initialize list to store torque data
@@ -135,10 +147,10 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            #actions = stepper(count, period = 60, num_envs=args_cli.num_envs)
+            actions = stepper(count, period = 60, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
-            actions = both_legs_0(num_envs=args_cli.num_envs)
+            #actions = both_legs_0(num_envs=args_cli.num_envs)
 
             # if count % env.max_episode_length <= 150:
             #     actions = both_legs_0(num_envs=args_cli.num_envs)

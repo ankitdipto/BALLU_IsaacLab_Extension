@@ -120,8 +120,15 @@ def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityC
     pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
     feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
     feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
+    feet_x_pos_w = feet_pos_w[:, :, 0] # (num_envs, 2)
     min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
-    rew = torch.where(min_feet_z_pos_w > 0.75, 
+    
+    obstacle_spacing_y = -2.0
+    difficulty_indices = env.scene.env_origins[:, 1] / obstacle_spacing_y
+    obstacle_heights = [env.obstacle_height_list[int(difficulty_idx)] for difficulty_idx in difficulty_indices]
+    obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device).unsqueeze(-1)
+    # min_feet_z_pos_w = torch.where((feet_x_pos_w >= 0.5) & (feet_x_pos_w <= 1.5), min_feet_z_pos_w - obstacle_heights_t, min_feet_z_pos_w)
+    rew = torch.where(min_feet_z_pos_w > 0.76, 
                                         -10.0, 
                                         torch.exp(slope * min_feet_z_pos_w) - 1)
     # rew = torch.exp(slope * min_feet_z_pos_w) - 1
