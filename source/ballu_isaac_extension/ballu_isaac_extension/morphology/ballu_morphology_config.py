@@ -46,7 +46,7 @@ class LinkDensities:
     """
     PELVIS: Final[float] = 1805.5
     FEMUR: Final[float] = 329.3
-    TIBIA: Final[float] = 1444.8
+    TIBIA: Final[float] = 800 #1444.8
     MOTORARM: Final[float] = 1666.7
     BALLOON_EFFECTIVE: Final[float] = 0.706
 
@@ -165,7 +165,7 @@ class ContactParams:
     
     # Friction coefficients
     foot_friction: float = 0.9      # Ground contact
-    leg_friction: float = 0.5       # Leg-object contact (not in original URDF)
+    leg_friction: float = 0.9       # Leg-object contact
     pelvis_friction: float = 0.5    # Pelvis-object contact
     balloon_friction: float = 0.3   # Balloon-object contact
     

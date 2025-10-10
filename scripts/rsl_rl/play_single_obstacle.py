@@ -146,11 +146,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         1.0
     )
 
-    isaac_env.viewport_camera_controller._cfg.eye = EYE
-    isaac_env.viewport_camera_controller._cfg.lookat = LOOKAT
+    isaac_env.cfg.viewer.eye = EYE
+    isaac_env.cfg.viewer.lookat = LOOKAT
     
-    print(f"[DEBUG] Camera eye: {isaac_env.viewport_camera_controller._cfg.eye}")
-    print(f"[DEBUG] Camera lookat: {isaac_env.viewport_camera_controller._cfg.lookat}")
+    print(f"[DEBUG] Camera eye: {isaac_env.cfg.viewer.eye}")
+    print(f"[DEBUG] Camera lookat: {isaac_env.cfg.viewer.lookat}")
     # wrap for video recording
     
     if args_cli.video:
@@ -311,9 +311,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 # Exit the play loop after recording one video
                 if timestep == args_cli.video_length:
                     break
-            else:
-                if timestep == env.unwrapped.max_episode_length:
-                    break
+            # else:
+            #     if timestep == env.unwrapped.max_episode_length:
+            #         break
             #if timestep == 400: # TODO: Remove this
             #    break
             pbar.update(1)

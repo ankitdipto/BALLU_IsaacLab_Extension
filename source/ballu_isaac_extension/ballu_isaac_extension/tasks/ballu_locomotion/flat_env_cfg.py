@@ -107,7 +107,7 @@ class ConstantVelCommandCfg:
         heading_command=False,  # Not using heading commands
         debug_vis=True,
         ranges=mdp.UniformVelocityCommandCfg.Ranges(
-            lin_vel_x=(0.23, 0.23),  # Constant 0.1927 m/s along +x
+            lin_vel_x=(0.12, 0.12),  # Constant 0.1927 m/s along +x
             lin_vel_y=(0.0, 0.0),  # No y-velocity
             ang_vel_z=(0.0, 0.0),  # No angular velocity
         ),
@@ -205,7 +205,7 @@ class RewardsCfg:
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
-        weight=4.0,
+        weight=0.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
@@ -215,9 +215,19 @@ class RewardsCfg:
         params=
             {
                 "command_name": "base_velocity", 
-                "std": 0.5
+                "std": 0.1
             }
     )
+
+    # Reward to encourage high jump
+    high_jump = RewTerm(
+        func=mdp.feet_z_pos_exp,
+        weight=1.0,
+        params={
+            "slope": 1.73
+        }
+    )
+
     track_lin_vel_xy_world_exp = RewTerm(
         func=mdp.track_lin_vel_xy_world_exp_ballu, 
         weight=0.0, #1.0, 
@@ -231,14 +241,6 @@ class RewardsCfg:
     feet_z_pos = RewTerm(
         func=mdp.feet_z_pos,
         weight=0.0,
-    )
-
-    high_jump = RewTerm(
-        func=mdp.feet_z_pos_exp,
-        weight=0.0,
-        params={
-            "slope": 1.73
-        }
     )
 
     # Penalize lateral velocity

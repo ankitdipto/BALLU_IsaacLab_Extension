@@ -25,11 +25,71 @@ def forward_velocity_x(
     """Reward forward velocity along the x-axis"""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     Vx = torch.nan_to_num(asset.data.root_lin_vel_b[:, 0], nan=0.0)
-    Vx = torch.where(Vx > 0.6, torch.zeros_like(Vx), Vx)
+    Vx = torch.where(Vx > 0.8, torch.zeros_like(Vx), Vx)
     # Transform negative velocities using exponential function
     Vx = torch.where(Vx < 0.0, torch.exp(Vx) - 1, Vx)
     # Vx = torch.clamp(Vx, min=-0.5) # This component introduced severe learning slowdown in the rough terrain environment. Better to keep it disabled unless absolutely necessary.
     return Vx
+
+# 2\left(e^{2x}-1\right)
+def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward feet z position."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
+    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
+    tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
+    feet_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], 
+                                device=env.device, dtype=tibia_pos_w.dtype)
+    feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
+    pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+    feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
+    feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
+    feet_x_pos_w = feet_pos_w[:, :, 0] # (num_envs, 2)
+    min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
+    
+    # obstacle_spacing_y = -2.0
+    # difficulty_indices = env.scene.env_origins[:, 1] / obstacle_spacing_y
+    # obstacle_heights = [env.obstacle_height_list[int(difficulty_idx)] for difficulty_idx in difficulty_indices]
+    # obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device).unsqueeze(-1)
+    # min_feet_z_pos_w = torch.where((feet_x_pos_w >= 0.5) & (feet_x_pos_w <= 1.5), min_feet_z_pos_w - obstacle_heights_t, min_feet_z_pos_w)
+    rew = torch.where(min_feet_z_pos_w > 1.8, 
+                                        -10.0, 
+                                        torch.exp(slope * min_feet_z_pos_w) - 1)
+    # rew = torch.exp(slope * min_feet_z_pos_w) - 1
+    rew = torch.nan_to_num(rew, nan=0.0)
+    # assert rew has no nan
+    assert not torch.isnan(rew).any()
+    return rew
+
+def position_tracking_l2_singleObj(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), warmup_period: int = 0) -> torch.Tensor:
+    """Reward position tracking using L2 norm."""
+    if env.rsl_rl_iteration < warmup_period:
+        return torch.zeros(env.num_envs, device=env.device, dtype=torch.float32)
+        
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    env_origins = env.scene.env_origins
+    # Each env has an obstacle of width 2.0 m, so the center of the obstacle is at distance of 1.0 m in the corresponding y-direction.
+    # The y-coordinate of goal center is same as obstacle which happens to be same as env_origin_y.
+    # The x-coordinate of goal center = env_origin_X + 2.0 m
+    goal_pos_w = env_origins[:, :2] + torch.tensor([2.0, 0.0], device=env.device, dtype=env_origins.dtype)
+    motor_arm_ids, _ = asset.find_bodies("MOTORARM_(LEFT|RIGHT)") # (2,)
+    motorarm_pos_w_XY = asset.data.body_link_pos_w[:, motor_arm_ids, :2] # (num_envs, 2, 2)
+    mean_motorarm_pos_w_XY = motorarm_pos_w_XY.mean(dim=1) # (num_envs, 2)
+    error = torch.norm(goal_pos_w - mean_motorarm_pos_w_XY, p=2, dim=1)
+    rew = 1.0 - 0.33 * error
+    rew = torch.nan_to_num(rew, nan=-1.0)
+    rew = torch.clip(rew, min=-10.0)
+    return rew
+
+def goal_reached_bonus(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward goal reached."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    env_origins = env.scene.env_origins
+    goal_pos_w = env_origins[:, :2] + torch.tensor([2.0, 0.0], device=env.device, dtype=env_origins.dtype)
+    error = torch.norm(goal_pos_w - asset.data.root_pos_w[:, :2], p=2, dim=1)
+    rew = torch.where(error < 0.1, 1.0, 0.0)
+    return rew
 
 def lateral_velocity_y(
     env: ManagerBasedRLEnv,
@@ -106,36 +166,6 @@ def feet_z_pos(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCf
     # print("feet_z_pos_w: ", feet_z_pos_w)
     # print("feet_z_pos_w.min(dim = 1): ", feet_z_pos_w.min(dim = 1)[0])
     return feet_z_pos_w.min(dim = 1)[0]
-
-# 2\left(e^{2x}-1\right)
-def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
-    """Reward feet z position."""
-    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
-    tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
-    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
-    tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
-    feet_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], 
-                                device=env.device, dtype=tibia_pos_w.dtype)
-    feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
-    pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
-    feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
-    feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
-    feet_x_pos_w = feet_pos_w[:, :, 0] # (num_envs, 2)
-    min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
-    
-    obstacle_spacing_y = -2.0
-    difficulty_indices = env.scene.env_origins[:, 1] / obstacle_spacing_y
-    obstacle_heights = [env.obstacle_height_list[int(difficulty_idx)] for difficulty_idx in difficulty_indices]
-    obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device).unsqueeze(-1)
-    # min_feet_z_pos_w = torch.where((feet_x_pos_w >= 0.5) & (feet_x_pos_w <= 1.5), min_feet_z_pos_w - obstacle_heights_t, min_feet_z_pos_w)
-    rew = torch.where(min_feet_z_pos_w > 0.76, 
-                                        -10.0, 
-                                        torch.exp(slope * min_feet_z_pos_w) - 1)
-    # rew = torch.exp(slope * min_feet_z_pos_w) - 1
-    rew = torch.nan_to_num(rew, nan=0.0)
-    # assert rew has no nan
-    assert not torch.isnan(rew).any()
-    return rew
 
 def feet_air_time_positive_biped(env: ManagerBasedRLEnv, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """Reward long steps taken by the feet for bipeds.
@@ -220,18 +250,3 @@ def ang_vel_z_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntity
     # extract the used quantities (to enable type-hinting)
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     return torch.square(asset.data.root_ang_vel_b[:, 2])
-
-def position_tracking_l1_singleObj(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
-    """Reward position tracking using L1 norm."""
-    # extract the used quantities (to enable type-hinting)
-    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
-    env_origins = env.scene.env_origins
-    # Each env has an obstacle of width 2.0 m, so the center of the obstacle is at distance of 1.0 m in the corresponding y-direction.
-    # The y-coordinate of goal center is same as obstacle which happens to be same as env_origin_y.
-    # The x-coordinate of goal center = env_origin_X + 2.0 m
-    goal_pos_w = env_origins[:, :2] + torch.tensor([2.0, 0.0], device=env.device, dtype=env_origins.dtype)
-    error = torch.norm(goal_pos_w - asset.data.root_pos_w[:, :2], p=2, dim=1)
-    rew = 1.0 - 0.5 * error
-    rew = torch.nan_to_num(rew, nan=-1.0)
-    rew = torch.clip(rew, min=-10.0)
-    return rew

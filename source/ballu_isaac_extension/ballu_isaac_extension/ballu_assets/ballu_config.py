@@ -76,7 +76,7 @@ BALLU_REAL_CFG = ArticulationCfg(
             spring_damping=1.0e-2,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
             pd_p=1.0, #0.08, #1.0,
-            pd_d=0.08,
+            pd_d=0.08, #0.02
             stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
             damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
         ),

@@ -168,9 +168,18 @@ class RewardsCfg:
     """Reward terms for the MDP."""
 
     # Primary reward - reach the goal
-    position_tracking_l1_singleObj = RewTerm(
-        func=mdp.position_tracking_l1_singleObj,
+    position_tracking_l2_singleObj = RewTerm(
+        func=mdp.position_tracking_l2_singleObj,
         weight=5.0,
+        params={
+            "warmup_period": 100
+        }
+    )
+
+    # Sparse reward to encourage reaching the goal
+    goal_reached_bonus = RewTerm(
+        func=mdp.goal_reached_bonus,
+        weight=0.0,
     )
 
     # Shaping reward - jump to clear the obstacle
@@ -182,17 +191,17 @@ class RewardsCfg:
         }
     )
 
+    # Reward to encourage tracking the command direction
+    forward_vel_base = RewTerm(
+        func=mdp.forward_velocity_x,
+        weight=0.0,
+    )
+
     # Reward to encourage tracking the command velocity
     track_lin_vel_xy_base_l2 = RewTerm(
         func=mdp.track_lin_vel_xy_base_l2,
         weight=0.0,
         params={"command_name": "base_velocity"}
-    )
-
-    # Reward to encourage tracking the command direction
-    forward_vel_base = RewTerm(
-        func=mdp.forward_velocity_x,
-        weight=3.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
@@ -227,11 +236,11 @@ class TerminationsCfg:
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Invalid simulator state (terminal)
-    invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 10.0})
+    invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 1.0})
     # (3) Root height above hard limit (terminal)
     root_height_above = DoneTerm(func=mdp.root_height_above, params={"z_limit": 5.0})
     # (4) Feet z position above hard limit (terminal)
-    feet_z_pos_above = DoneTerm(func=mdp.feet_z_pos_above, params={"z_limit": 0.8})
+    feet_z_pos_above = DoneTerm(func=mdp.feet_z_pos_above, params={"z_limit": 2.5})
 
 
 @configclass
@@ -268,8 +277,8 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 8 * 2.0, 2.0)
-        self.viewer.lookat = (1.0, 0.0 - 8 * 2.0, 1.0)
+        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 11 * 2.0, 2.0)
+        self.viewer.lookat = (1.0, 0.0 - 11 * 2.0, 1.0)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
@@ -285,13 +294,13 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.scene.env_spacing = 2.5e-4
         # --- Obstacle array parameters (user-configurable) ---
         # Number of obstacles along -y
-        obstacle_num: int = 60
+        obstacle_num: int = 75
         # Obstacle base size in x and y (meters)
         obstacle_size_x: float = 1.0
         obstacle_size_y: float = 2.0
         # Base height and multiplicative growth per step i: h_i = base * (1+growth)^i
-        obstacle_base_height: float = 0.010
-        obstacle_growth_delta: float = 0.020
+        obstacle_base_height: float = 0.001
+        obstacle_growth_delta: float = 0.010
         # Spacing between obstacle centers along -y and x line where obstacles sit
         obstacle_spacing_y: float = 2.0
         obstacle_x_line: float = 1.0

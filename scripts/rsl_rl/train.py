@@ -31,8 +31,8 @@ parser.add_argument("--common_folder", type=str, default=None,
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
 parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
-parser.add_argument("--balloon_buoyancy_mass", type=float, default=None, 
-                   help="Buoyancy mass of the balloon")
+parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+                   help="Gravity compensation ratio")
 parser.add_argument("--fl_ratio", type=float, default=0.5, 
                    help="Ratio of femur length to total leg length")
 
@@ -142,7 +142,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
-                   balloon_buoyancy_mass=args_cli.balloon_buoyancy_mass)
+                   gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
 
     # wrap for video recording
     if args_cli.video:
@@ -186,6 +186,9 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # close the simulator
     env.close()
+
+    # print the log directory
+    print(f"EXP_DIR: {log_dir}")
 
 
 if __name__ == "__main__":

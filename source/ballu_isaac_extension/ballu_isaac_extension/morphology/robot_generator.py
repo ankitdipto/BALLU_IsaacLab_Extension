@@ -262,6 +262,7 @@ class BalluRobotGenerator:
             mass=m.tibia_mass,
             radius=g.limb_radius,
             length=g.tibia_length,
+            com_y=0.587371703*g.tibia_length
         )
         
         # Balloon: large cylinder along Y-axis (oriented downward)
