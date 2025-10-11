@@ -125,7 +125,7 @@ def main():
     print(f"Robot body names: {robots.body_names}")
     print(f"Robot joint names: {robots.joint_names}")
 
-    print("Viewer object: ", env.viewport_camera_controller.__dict__)
+    # print("Viewer object: ", env.viewport_camera_controller.__dict__)
     
     # simulate physics
     # Initialize list to store torque data
@@ -219,45 +219,17 @@ def main():
             # Print obstacle size (world-space) once using raw USD API
             if count == 1:
                 try:
-                    obstacle_asset = env.unwrapped.scene["obstacle"]
                     stage = omni.usd.get_context().get_stage()
-                    prim_path_env0 = None
-                    # Try multiple ways to resolve the prim path
-                    try:
-                        if hasattr(obstacle_asset, "cfg") and hasattr(obstacle_asset.cfg, "prim_path"):
-                            prim_paths = sim_utils.find_matching_prim_paths(obstacle_asset.cfg.prim_path)
-                            if len(prim_paths) > 0:
-                                prim_path_env0 = prim_paths[0]
-                    except Exception:
-                        pass
-                    if prim_path_env0 is None and hasattr(obstacle_asset, "prim_path"):
-                        prim_path_env0 = obstacle_asset.prim_path
-                        print("obstacle has prim path")
-                    if prim_path_env0 is None and hasattr(obstacle_asset, "prim"):
-                        prim_path_env0 = obstacle_asset.prim.GetPath().pathString
-                        print("obstacle has prim")
-                    if prim_path_env0 is None:
-                        # Fallback: search under /World for prims named "obstacle" and take the first (env 0)
-                        prims = sim_utils.get_all_matching_child_prims("/World", predicate=lambda p: p.GetName() == "obstacle")
-                        if len(prims) > 0:
-                            prim_path_env0 = prims[0].GetPath().pathString
-                            print("obstacle has array of prims")
-                    if prim_path_env0 is None:
-                        print("[WARN] Could not resolve obstacle prim path.")
-                    else:
-                        prim = stage.GetPrimAtPath(prim_path_env0)
-                        bbox_cache = UsdGeom.BBoxCache(Usd.TimeCode.Default(), [UsdGeom.Tokens.default_, UsdGeom.Tokens.render], False)
-                        world_bbox = bbox_cache.ComputeWorldBound(prim)
-                        aligned_box = world_bbox.ComputeAlignedBox()
-                        min_pt = aligned_box.GetMin()
-                        max_pt = aligned_box.GetMax()
-                        size_x = max_pt[0] - min_pt[0]
-                        size_y = max_pt[1] - min_pt[1]
-                        size_z = max_pt[2] - min_pt[2]
-                        print(f"[INFO] Obstacle world size (X,Y,Z) for env 0 at {prim_path_env0}: ({size_x:.4f}, {size_y:.4f}, {size_z:.4f})")
+                    femur_left_cylinder_env0 = "/World/envs/env_0/Robot/FEMUR_LEFT/collisions/mesh_0/cylinder"
+                    prim = stage.GetPrimAtPath(femur_left_cylinder_env0)
+                    print(prim)
+                    print("Femur left cylinder prim path: ", prim.GetPath())
+                    geom = UsdGeom.Cylinder(prim)
+                    print("Femur left cylinder height: ", geom.GetHeightAttr().Get())
+                    print("Femur left cylinder radius: ", geom.GetRadiusAttr().Get())
                 except Exception as e:
                     print(f"[WARN] Failed to query obstacle size via USD: {e}")
-                print("Obstacle height list: ", env.unwrapped.obstacle_height_list)
+            #     print("Obstacle height list: ", env.unwrapped.obstacle_height_list)
             # if count % env.max_episode_length == 0:
             #     env.unwrapped.scene._default_env_origins = torch.rand(env.unwrapped.num_envs, 3, device=env.device) * 6.0
             #     env.unwrapped.scene._default_env_origins[:, 2] = 0.7

@@ -190,8 +190,8 @@ class EventCfg:
 class RewardsCfg:
     """Reward terms for the MDP."""
     # Position tracking reward
-    position_tracking_l1_singleObj = RewTerm(
-        func=mdp.position_tracking_l1_singleObj,
+    position_tracking_l2_singleObj = RewTerm(
+        func=mdp.position_tracking_l2_singleObj,
         weight=0.0,
     )
 

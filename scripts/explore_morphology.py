@@ -29,7 +29,8 @@ def run_training_experiment(
         task: str = "Isc-Vel-BALLU-1-obstacle",
         max_iterations: int = 50,
         seed: int = 42,
-        knee_damping: float = 0.08
+        knee_damping: float = 0.08,
+        spring_damping: float = 0.01
     ) -> tuple[bool, float]:
     """Run training experiment and return success status and best curriculum level."""
     train_script_path = f"{project_dir}/scripts/rsl_rl/train.py"
@@ -41,7 +42,8 @@ def run_training_experiment(
         "--run_name", f"{morph_id}_seed{seed}",
         "--headless",
         "--seed", str(seed),
-        f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}"
+        f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}"
     ]
 
     env = os.environ.copy()
@@ -111,11 +113,12 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     # Sample parameters
     # femur_length = trial.suggest_float("femur_length", 0.20, 0.45)
     # tibia_length = trial.suggest_float("tibia_length", 0.20, 0.45)
-    femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.0, 1.0)
+    femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
+    spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
     
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
-    morph_id = f"trial{trial.number:02d}_FLr{femur_to_limb_ratio:.2f}_knKd{knee_damping:.2f}"
+    morph_id = f"trial{trial.number:02d}_tbD400_FLr{femur_to_limb_ratio:.2f}_knKd{knee_damping:.2f}_spD{spring_damping:.2f}"
 
     sampled_config = {
         "morphology_id": morph_id,
@@ -138,7 +141,8 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
         task=task,
         max_iterations=max_iterations, 
         seed=seed,
-        knee_damping=knee_damping
+        knee_damping=knee_damping,
+        spring_damping=spring_damping
     )
     
     if not success:

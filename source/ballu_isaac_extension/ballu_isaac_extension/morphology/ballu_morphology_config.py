@@ -46,7 +46,7 @@ class LinkDensities:
     """
     PELVIS: Final[float] = 1805.5
     FEMUR: Final[float] = 329.3
-    TIBIA: Final[float] = 800 #1444.8
+    TIBIA: Final[float] = 400 #1444.8
     MOTORARM: Final[float] = 1666.7
     BALLOON_EFFECTIVE: Final[float] = 0.706
 
