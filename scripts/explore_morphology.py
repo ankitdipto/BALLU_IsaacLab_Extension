@@ -30,7 +30,8 @@ def run_training_experiment(
         max_iterations: int = 50,
         seed: int = 42,
         knee_damping: float = 0.08,
-        spring_damping: float = 0.01
+        spring_damping: float = 0.01,
+        gravity_comp_ratio: float = 0.84
     ) -> tuple[bool, float]:
     """Run training experiment and return success status and best curriculum level."""
     train_script_path = f"{project_dir}/scripts/rsl_rl/train.py"
@@ -42,6 +43,7 @@ def run_training_experiment(
         "--run_name", f"{morph_id}_seed{seed}",
         "--headless",
         "--seed", str(seed),
+        "--gravity_compensation_ratio", str(gravity_comp_ratio),
         f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
         f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}"
     ]
@@ -64,15 +66,15 @@ def run_training_experiment(
         print(f"Training timeout (2h), killing process")
         process.kill()
         process.wait()
-        return False, float('-inf')
+        return False, float('-inf'), ""
 
     if process.returncode != 0:
-        return False, float('-inf')
+        return False, float('-inf'), ""
     
     ckpt_dict = torch.load(os.path.join(log_dir, "model_best.pt"))
     best_crclm_level = ckpt_dict["best_crclm_level"]
     
-    return True, best_crclm_level
+    return True, best_crclm_level, log_dir
 
 
 def generate_morphology_from_params(sampled_config: dict, trial_number: int):
@@ -116,9 +118,10 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
     spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.78, 0.88)
     
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
-    morph_id = f"trial{trial.number:02d}_tbD400_FLr{femur_to_limb_ratio:.2f}_knKd{knee_damping:.2f}_spD{spring_damping:.2f}"
+    morph_id = f"trial{trial.number:02d}_FLr{femur_to_limb_ratio:.3f}_knKd{knee_damping:.3f}_spD{spring_damping:.3f}_GCR{gravity_comp_ratio:.3f}"
 
     sampled_config = {
         "morphology_id": morph_id,
@@ -136,13 +139,14 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     
     # Run training with passed parameters
     print(f"[Trial {trial.number}] Starting training (max_iter={max_iterations}, seed={seed}, task={task})...")
-    success, best_crclm_level = run_training_experiment(
+    success, best_crclm_level, log_dir = run_training_experiment(
         final_morph_id, 
         task=task,
         max_iterations=max_iterations, 
         seed=seed,
         knee_damping=knee_damping,
-        spring_damping=spring_damping
+        spring_damping=spring_damping,
+        gravity_comp_ratio=gravity_comp_ratio
     )
     
     if not success:
@@ -156,6 +160,7 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     trial.set_user_attr("urdf_path", urdf_path)
     trial.set_user_attr("usd_path", usd_path)
     trial.set_user_attr("best_crclm_level", best_crclm_level)
+    trial.set_user_attr("log_dir", log_dir)
     
     return best_crclm_level
 
@@ -224,10 +229,13 @@ def main():
         print(f"  Parameters: {best_trial.params}")
         if "morphology_id" in best_trial.user_attrs:
             print(f"  Morphology ID: {best_trial.user_attrs['morphology_id']}")
-        
+        if "log_dir" in best_trial.user_attrs:
+            print(f"  Log Directory: {best_trial.user_attrs['log_dir']}")
         print("\nTop 5 Trials:")
         for i, trial in enumerate(sorted(completed_trials, key=lambda t: t.value, reverse=True)[:5], 1):
             print(f"  {i}. Trial {trial.number}: {trial.value:.4f} - {trial.params}")
+            if "log_dir" in trial.user_attrs:
+                print(f"    Log Directory: {trial.user_attrs['log_dir']}")
     else:
         print("No trials completed successfully.")
     
@@ -246,7 +254,9 @@ def main():
             "max_iterations": MAX_ITERATIONS,
             "seed": SEED,
             "task": TASK
-        }
+        },
+        "best_trial_log_dir": best_trial.user_attrs["log_dir"] if "log_dir" in best_trial.user_attrs else None,
+        "best_trial_morphology_id": best_trial.user_attrs["morphology_id"] if "morphology_id" in best_trial.user_attrs else None
     }
     
     with open(summary_path, 'w') as f:
