@@ -54,3 +54,16 @@ def height_of_obstacle_in_front_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
     obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device)
     # Ensure shape is (num_envs, 1) for concatenation compatibility
     return obstacle_heights_t.unsqueeze(-1)
+
+def distance_of_limbs_from_obstacle_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Distance of limbs from obstacle"""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    env_origins = env.scene.env_origins
+    # The obstacle edge starts at x = 0.5m from the env origin
+    obstacle_edge_x = env_origins[:, 0] + 0.5 # (num_envs, 1)
+    tibia_ids,_ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
+    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
+    tibia_pos_w_x = tibia_pos_w[:, :, 0] # (num_envs, 2)
+    tibia_dist_from_obstacle = obstacle_edge_x - tibia_pos_w_x # (num_envs, 2)
+    return tibia_dist_from_obstacle.unsqueeze(-1)

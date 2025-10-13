@@ -145,6 +145,15 @@ class ObservationsCfg:
         distance_to_obstacle = ObsTerm(func=mdp.distance_to_obstacle_priv)
         height_of_obstacle = ObsTerm(func=mdp.height_of_obstacle_in_front_priv)
 
+        # Where is the robot wrt environment origin i.e. environment frame?
+        robot_pos_w = ObsTerm(func=mdp.root_pos_w)
+
+        # How far are the limbs from the obstacle?
+        limb_dist_from_obstacle = ObsTerm(func=mdp.distance_of_limbs_from_obstacle_priv)
+
+        # What action did the robot take last?
+        last_action = ObsTerm(func=mdp.last_action)
+
         def __post_init__(self):
             self.enable_corruption = False
             self.concatenate_terms = True
