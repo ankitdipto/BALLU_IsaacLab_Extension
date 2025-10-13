@@ -7,6 +7,7 @@ import json
 import argparse
 import optuna
 from optuna.trial import TrialState
+from optuna.integration.wandb import WeightsAndBiasesCallback
 import torch
 
 # --- Path Setup ---
@@ -118,7 +119,7 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
     spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
-    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.78, 0.88)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.86, 0.90)
     
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
     morph_id = f"trial{trial.number:02d}_FLr{femur_to_limb_ratio:.3f}_knKd{knee_damping:.3f}_spD{spring_damping:.3f}_GCR{gravity_comp_ratio:.3f}"
@@ -207,13 +208,20 @@ def main():
         sampler=optuna.samplers.TPESampler(seed=42)
     )
     
+    wandb_cb = WeightsAndBiasesCallback(
+        wandb_kwargs={"project": "BALLU_MorphOpt_1_Obstacle", "entity": "ankitdipto"},
+        as_multirun=True,
+        metric_name="best_crclm_level"
+    )
+
     # Run optimization with lambda to pass additional parameters
     try:
         study.optimize(
             lambda trial: objective(trial, MAX_ITERATIONS, SEED, TASK),
             n_trials=N_TRIALS, 
             show_progress_bar=True, 
-            catch=(Exception,)
+            catch=(Exception,),
+            callbacks=[wandb_cb]
         )
     except KeyboardInterrupt:
         print("\nOptimization interrupted by user.")
