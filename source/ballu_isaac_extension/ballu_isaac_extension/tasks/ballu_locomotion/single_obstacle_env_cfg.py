@@ -203,7 +203,7 @@ class RewardsCfg:
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
-        weight=0.0,
+        weight=3.0,
     )
 
     # Reward to encourage tracking the command velocity
@@ -286,8 +286,8 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 11 * 2.0, 2.0)
-        self.viewer.lookat = (1.0, 0.0 - 11 * 2.0, 1.0)
+        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 0 * 2.0, 2.0)
+        self.viewer.lookat = (1.0, 0.0 - 0 * 2.0, 1.0)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings
         self.sim.dt = 1 / 200.0 #160.0
