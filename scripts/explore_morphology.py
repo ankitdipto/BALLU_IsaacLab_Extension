@@ -174,8 +174,9 @@ def main():
     parser.add_argument("--max_iterations", type=int, default=1600, help="Max training iterations per trial (default: 1600)")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for training (default: 42)")
     parser.add_argument("--task", type=str, default="Isc-Vel-BALLU-1-obstacle", help="Task name (default: Isc-Vel-BALLU-1-obstacle)")
-    parser.add_argument("--study_name", type=str, default=None, help="Study name (default: auto-generated with timestamp)")
+    parser.add_argument("--study_name", type=str, default="TPE", help="Study name (default: TPE)")
     parser.add_argument("--storage", type=str, default=None, help="Database storage path (default: sqlite:///logs/optuna/TPE.db)")
+    parser.add_argument("--resume", action="store_true", default=False, help="Resume from existing study (default: False)")
     
     args = parser.parse_args()
     
@@ -186,7 +187,7 @@ def main():
     TASK = args.task
     
     timestamp = datetime.now().strftime("%b_%d_%H_%M_%S")
-    STUDY_NAME = args.study_name if args.study_name else f"{timestamp}_TPE"
+    STUDY_NAME = args.study_name if args.resume else f"{timestamp}_{args.study_name}"
     STORAGE = args.storage if args.storage else f"sqlite:///{project_dir}/logs/optuna/TPE.db"
     
     print(f"\n{'='*80}\nBALLU MORPHOLOGY OPTIMIZATION\n{'='*80}")
@@ -204,7 +205,7 @@ def main():
         study_name=STUDY_NAME,
         storage=STORAGE,
         direction="maximize",
-        load_if_exists=True,
+        load_if_exists=args.resume,
         sampler=optuna.samplers.TPESampler(seed=42)
     )
     
