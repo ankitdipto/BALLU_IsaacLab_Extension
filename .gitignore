@@ -42,3 +42,7 @@ _build
 *rewards*.csv
 **/morphologies/**
 **/morphology/*_SUMMARY.md
+
+**/ballu_new/**
+**/original/**
+**/ballu_v0.usd
