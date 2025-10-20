@@ -86,7 +86,10 @@ def run_testing_experiment(
         num_envs: int = 1,
         video_length: int = 399,
         device: str = "cuda:0",
-        difficulty_level: int = 0
+        difficulty_level: int = 0,
+        knee_damping: float = 0.08,
+        spring_damping: float = 0.01,
+        gravity_compensation_ratio: float = 0.84
     ) -> bool:
     """Run testing experiment for a trained morphology and return success status."""
     test_script_path = f"{project_dir}/scripts/rsl_rl/play_single_obstacle.py"
@@ -102,6 +105,9 @@ def run_testing_experiment(
         "--device", device,
         "--headless",
         "--difficulty_level", str(difficulty_level),
+        "--gravity_compensation_ratio", str(gravity_compensation_ratio),
+        f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}",
     ]
 
     env = os.environ.copy()
@@ -225,7 +231,7 @@ def objective(
 
     # Run testing for this morphology
     run_name = log_dir.split("/")[-1] if log_dir else ""
-    difficulty = int(best_crclm_level * 100) - 1 if best_crclm_level > 0 else 0
+    difficulty = int(best_crclm_level * 100) if best_crclm_level > 0 else 0
     print(f"[Trial {trial.number}] Starting testing (difficulty={difficulty})...")
     test_success = run_testing_experiment(
         morph_id=final_morph_id,
@@ -236,6 +242,9 @@ def objective(
         video_length=test_video_length,
         device=device,
         difficulty_level=difficulty,
+        knee_damping=knee_damping,
+        spring_damping=spring_damping,
+        gravity_comp_ratio=gravity_comp_ratio
     )
     print(f"[Trial {trial.number}] Testing {'SUCCESS' if test_success else 'FAILED'}")
     trial.set_user_attr("test_success", test_success)
