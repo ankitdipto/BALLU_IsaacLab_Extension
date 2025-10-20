@@ -103,7 +103,7 @@ def main():
     env_cfg = BalluFlatEnvCfg()
     # env_cfg = BalluSingleObstacleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
-    env_cfg.scene.robot.init_state.pos = (0.0, 0.0, 1.0)
+    #env_cfg.scene.robot.init_state.pos = (0.0, 0.0, 1.0)
     # env_cfg.scene.robot.spawn.usd_path = f"{modifier.usd_root_dir}/{modifier.morphology_name}/{modifier.morphology_name}.usd"
     #env_cfg.scene.robot.spawn.usd_path = \
     #    "/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/FT_37/ballu_modified_FT_37.usd"
@@ -151,11 +151,11 @@ def main():
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
-
-            if count % env.max_episode_length <= 150:
-                actions = both_legs_theta(theta=0.1, num_envs=args_cli.num_envs)
-            else:
-                actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
+            # if count % env.max_episode_length <= 150:
+            #     actions = both_legs_theta(theta=0.1, num_envs=args_cli.num_envs)
+            # else:
+            #     actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             # ---- Best action sequence for jumping ----
             # if count % 140 <= 80:
             #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)

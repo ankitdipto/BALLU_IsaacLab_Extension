@@ -6,8 +6,8 @@ class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20 #25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 100
-    experiment_name = "lab_10.14.2025"
-    empirical_normalization = False  # Obs norm uses running mean and std. 
+    experiment_name = "lab_10.21.2025"
+    empirical_normalization = True  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
     

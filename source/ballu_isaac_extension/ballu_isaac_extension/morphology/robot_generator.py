@@ -206,10 +206,12 @@ class BalluRobotGenerator:
         # Knee joints: at end of femur along Y-axis (in femur frame)
         self.knee_origin = (0.0, g.femur_length, 0.0)
         
-        # Motor joints: positioned along tibia
-        # Place at ~85% of tibia length (matches original design)
-        motor_y_pos = 0.85 * g.tibia_length
+        # Electronics joints: fixed at end of tibia (in tibia frame)
+        self.electronics_origin = (0.0, g.tibia_length, 0.0)
+        
+        # Motor joints: positioned on electronics at midpoint (in electronics frame)
         motor_x_offset = -0.008375  # Original X offset
+        motor_y_pos = g.electronics_length / 2.0  # Midpoint of electronics
         motor_z_left = 0.001   # Original Z offset for left
         motor_z_right = -0.001  # Original Z offset for right
         
@@ -220,14 +222,18 @@ class BalluRobotGenerator:
         self.neck_origin = (g.neck_offset_x, 0.0, g.neck_offset_z)
         
         # Collision geometry centers (in link local frame)
-        # Femur collision: centered at middle of femur
+        # Femur collision: centered at middle of femur (full length)
         self.femur_collision_center = (0.0, g.femur_length/2.0, 0.0)
         
-        # Tibia collision: centered at middle of tibia
+        # Tibia collision: centered at middle of tibia (full length)
         self.tibia_collision_center = (0.0, g.tibia_length/2.0, 0.0)
         
-        # Foot collision: at end of tibia
-        self.foot_position = (0.0, g.tibia_length, 0.0)
+        # Electronics collision: centered at middle of electronics
+        self.electronics_collision_center = (0.0, g.electronics_length/2.0, 0.0)
+        
+        # Foot collision: at end of electronics (in electronics frame)
+        foot_offset = 0.004  # Small offset from end for foot sphere
+        self.foot_position = (0.0, g.electronics_length + foot_offset, 0.0)
         
         # Balloon collision: offset downward from pelvis
         self.balloon_collision_center = (0.0, -0.38, 0.0)  # Original offset
@@ -256,13 +262,19 @@ class BalluRobotGenerator:
             length=g.femur_length,
         )
         
-        # Tibia: cylinder along Y-axis (includes foot mass for simplicity)
-        # In reality, foot is separate, but we approximate here
+        # Tibia: cylinder along Y-axis (no foot mass - foot is now on electronics)
         self.tibia_inertia = calc.cylinder_y_axis(
             mass=m.tibia_mass,
             radius=g.limb_radius,
             length=g.tibia_length,
-            com_y=0.587371703*g.tibia_length
+        )
+        
+        # Electronics: box along Y-axis
+        self.electronics_inertia = calc.box(
+            mass=m.electronics_mass,
+            x_size=g.electronics_width,
+            y_size=g.electronics_length,
+            z_size=g.electronics_height,
         )
         
         # Balloon: large cylinder along Y-axis (oriented downward)
@@ -463,6 +475,7 @@ Description: {1}
         self._create_pelvis_link(robot)
         self._create_femur_links(robot)
         self._create_tibia_links(robot)
+        self._create_electronics_links(robot)
         self._create_motorarm_links(robot)
         self._create_balloon_link(robot)
         
@@ -473,6 +486,7 @@ Description: {1}
         # Create joints
         self._create_hip_joints(robot)
         self._create_knee_joints(robot)
+        self._create_electronics_joints(robot)
         self._create_motor_joints(robot)
         self._create_neck_joint(robot)
         
@@ -568,7 +582,7 @@ Description: {1}
             )
     
     def _create_tibia_links(self, robot: ET.Element):
-        """Create TIBIA_LEFT and TIBIA_RIGHT links (with integrated feet)."""
+        """Create TIBIA_LEFT and TIBIA_RIGHT links (no foot - foot moved to electronics)."""
         for side in ["LEFT", "RIGHT"]:
             link = ET.SubElement(robot, "link")
             link.set("name", f"TIBIA_{side}")
@@ -591,7 +605,7 @@ Description: {1}
                     length=self.morph.geometry.tibia_length
                 )
             
-            # Collision 1: Tibia cylinder
+            # Collision: Tibia cylinder (full length)
             self._create_collision_cylinder(
                 link,
                 radius=self.morph.geometry.limb_radius,
@@ -599,8 +613,48 @@ Description: {1}
                 origin=self.tibia_collision_center,
                 friction=self.morph.contact.leg_friction
             )
+    
+    def _create_electronics_links(self, robot: ET.Element):
+        """Create ELECTRONICS_LEFT and ELECTRONICS_RIGHT links."""
+        for side in ["LEFT", "RIGHT"]:
+            link = ET.SubElement(robot, "link")
+            link.set("name", f"ELECTRONICS_{side}")
             
-            # Collision 2: Foot sphere
+            # Inertial
+            self._create_inertial_element(link, self.electronics_inertia)
+            
+            # Visual
+            if self.use_visual_meshes:
+                # Electronics don't have meshes, use primitive geometry
+                self._create_visual_primitive(
+                    link, "box", "color_electronics",
+                    origin=self.electronics_collision_center,
+                    rpy=(0, 0, 0),
+                    x=self.morph.geometry.electronics_width,
+                    y=self.morph.geometry.electronics_length,
+                    z=self.morph.geometry.electronics_height
+                )
+            else:
+                self._create_visual_primitive(
+                    link, "box", "color_electronics",
+                    origin=self.electronics_collision_center,
+                    rpy=(0, 0, 0),
+                    x=self.morph.geometry.electronics_width,
+                    y=self.morph.geometry.electronics_length,
+                    z=self.morph.geometry.electronics_height
+                )
+            
+            # Collision 1: Electronics box
+            self._create_collision_box(
+                link,
+                x_size=self.morph.geometry.electronics_width,
+                y_size=self.morph.geometry.electronics_length,
+                z_size=self.morph.geometry.electronics_height,
+                origin=self.electronics_collision_center,
+                rpy=(0, 0, 0)
+            )
+            
+            # Collision 2: Foot sphere (moved from tibia)
             self._create_collision_sphere(
                 link,
                 radius=self.morph.geometry.foot_radius,
@@ -735,6 +789,23 @@ Description: {1}
             dynamics.set("damping", f"{j.knee_damping:.2e}")
             dynamics.set("friction", f"{j.knee_friction:.2e}")
     
+    def _create_electronics_joints(self, robot: ET.Element):
+        """Create ELECTRONICS_JOINT_LEFT and ELECTRONICS_JOINT_RIGHT (fixed joints)."""
+        for side in ["LEFT", "RIGHT"]:
+            joint = ET.SubElement(robot, "joint")
+            joint.set("name", f"ELECTRONICS_JOINT_{side}")
+            joint.set("type", "fixed")
+            
+            origin_elem = ET.SubElement(joint, "origin")
+            origin_elem.set("xyz", self._format_origin(self.electronics_origin))
+            origin_elem.set("rpy", "0 0 0")
+            
+            parent = ET.SubElement(joint, "parent")
+            parent.set("link", f"TIBIA_{side}")
+            
+            child = ET.SubElement(joint, "child")
+            child.set("link", f"ELECTRONICS_{side}")
+    
     def _create_motor_joints(self, robot: ET.Element):
         """Create MOTOR_LEFT and MOTOR_RIGHT joints."""
         j = self.morph.joints
@@ -756,7 +827,7 @@ Description: {1}
             origin_elem.set("rpy", self._format_rpy(rpy))
             
             parent = ET.SubElement(joint, "parent")
-            parent.set("link", f"TIBIA_{side}")
+            parent.set("link", f"ELECTRONICS_{side}")
             
             child = ET.SubElement(joint, "child")
             child.set("link", f"MOTORARM_{side}")
@@ -813,6 +884,7 @@ Description: {1}
             ("color_femur_right", "0 0 0.8 1"),      # Blue
             ("color_tibia_left", "0.75 0.3 0.3 1"),  # Light red
             ("color_tibia_right", "0.3 0.3 0.75 1"), # Light blue
+            ("color_electronics", "0.2 0.2 0.2 1"),  # Dark gray
             ("color_motorarm", "1 0.93725 0.13725 1"),  # Yellow
             ("color_balloons", "0.7 0.7 0.7 0.7"),   # Translucent gray
         ]

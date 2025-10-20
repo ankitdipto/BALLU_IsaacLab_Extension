@@ -35,7 +35,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     terrain = AssetBaseCfg(
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(
-            size=(100.0, 100.0),
+            size=(200.0, 200.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 static_friction=0.5,  # Default: 0.5
                 dynamic_friction=0.5,  # Default: 0.5
@@ -181,14 +181,9 @@ class RewardsCfg:
         func=mdp.position_tracking_l2_singleObj,
         weight=5.0,
         params={
-            "warmup_period": 100
+            "begin_iter": 100,
+            "ramp_width": 100
         }
-    )
-
-    # Sparse reward to encourage reaching the goal
-    goal_reached_bonus = RewTerm(
-        func=mdp.goal_reached_bonus,
-        weight=0.0,
     )
 
     # Shaping reward - jump to clear the obstacle
@@ -204,6 +199,12 @@ class RewardsCfg:
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
         weight=3.0,
+    )
+
+    # Sparse reward to encourage reaching the goal
+    goal_reached_bonus = RewTerm(
+        func=mdp.goal_reached_bonus,
+        weight=0.0,
     )
 
     # Reward to encourage tracking the command velocity
@@ -245,7 +246,7 @@ class TerminationsCfg:
     # (1) Time out
     time_out = DoneTerm(func=mdp.time_out, time_out=True)
     # (2) Invalid simulator state (terminal)
-    invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 1.0})
+    invalid_state = DoneTerm(func=mdp.invalid_state, params={"max_root_speed": 10.0})
     # (3) Root height above hard limit (terminal)
     root_height_above = DoneTerm(func=mdp.root_height_above, params={"z_limit": 5.0})
     # (4) Feet z position above hard limit (terminal)
@@ -286,7 +287,7 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
         self.decimation = 10 #8
         self.episode_length_s = 20
         # viewer settings
-        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 0 * 2.0, 2.0)
+        self.viewer.eye = (1.0 - 5.5/1.414, 5.5/1.414 - 0 * 2.0, 1.5)
         self.viewer.lookat = (1.0, 0.0 - 0 * 2.0, 1.0)
         self.viewer.resolution = (1920, 1080) # Full HD resolution
         # simulation settings

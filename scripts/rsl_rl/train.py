@@ -61,6 +61,7 @@ import os
 import torch
 from datetime import datetime
 import math
+import traceback
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -144,6 +145,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
                    gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
 
+    # Shift the env origins to difficulty level 20
+    # isaac_env = env.unwrapped
+    # print("Isaac environment: ", isaac_env)
+    # inter_obstacle_spacing_y = -2.0
+    # isaac_env.scene._default_env_origins = isaac_env.scene._default_env_origins + \
+    #     torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * 20.0
+
     # wrap for video recording
     if args_cli.video:
         video_kwargs = {
@@ -181,11 +189,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
 
-    # run training
-    runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
-
-    # close the simulator
-    env.close()
+    try:
+        # run training
+        runner.learn(num_learning_iterations=agent_cfg.max_iterations, init_at_random_ep_len=True)
+    except Exception as e:
+        print(f"This run failed with error: {e}")
+        print(f"Traceback: {traceback.format_exc()}")
+    finally:
+        # close the simulator
+        env.close()
 
     # print the log directory
     print(f"EXP_DIR: {log_dir}")

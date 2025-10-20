@@ -45,15 +45,24 @@ def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityC
     feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
     feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
     feet_x_pos_w = feet_pos_w[:, :, 0] # (num_envs, 2)
+
     min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
     
-    # obstacle_spacing_y = -2.0
-    # difficulty_indices = env.scene.env_origins[:, 1] / obstacle_spacing_y
-    # obstacle_heights = [env.obstacle_height_list[int(difficulty_idx)] for difficulty_idx in difficulty_indices]
-    # obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device).unsqueeze(-1)
-    # min_feet_z_pos_w = torch.where((feet_x_pos_w >= 0.5) & (feet_x_pos_w <= 1.5), min_feet_z_pos_w - obstacle_heights_t, min_feet_z_pos_w)
+    obstacle_spacing_y = -2.0
+    difficulty_indices = env.scene.env_origins[:, 1] / obstacle_spacing_y
+    # Vectorized indexing: convert obstacle_height_list to tensor and use advanced indexing
+    obstacle_height_tensor = torch.tensor(env.obstacle_height_list, device=env.device, dtype=torch.float32)
+    difficulty_indices_int = difficulty_indices.long()  # Convert to integer indices
+    obstacle_heights_t = obstacle_height_tensor[difficulty_indices_int]
+
+    # print(f"[DEBUG] obstacle_heights_t shape: {obstacle_heights_t.shape}")
+    # print(f"[DEBUG] min_feet_z_pos_w shape: {min_feet_z_pos_w.shape}")
+
+    # Check if both feet are in the obstacle region (x between 0.5 and 1.5)
+    feet_in_obstacle_region = ((feet_x_pos_w >= 0.5) & (feet_x_pos_w <= 1.5)).all(dim=1)  # (num_envs,)
+    min_feet_z_pos_w = torch.where(feet_in_obstacle_region, min_feet_z_pos_w - obstacle_heights_t, min_feet_z_pos_w)
     rew = torch.where(min_feet_z_pos_w > 1.8, 
-                                        -10.0, 
+                                        0.0, 
                                         torch.exp(slope * min_feet_z_pos_w) - 1)
     # rew = torch.exp(slope * min_feet_z_pos_w) - 1
     rew = torch.nan_to_num(rew, nan=0.0)
@@ -61,9 +70,14 @@ def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityC
     assert not torch.isnan(rew).any()
     return rew
 
-def position_tracking_l2_singleObj(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), warmup_period: int = 0) -> torch.Tensor:
+def position_tracking_l2_singleObj(
+        env: ManagerBasedRLEnv, 
+        asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), 
+        begin_iter: int|None = None,
+        ramp_width: int|None = None,
+    ) -> torch.Tensor:
     """Reward position tracking using L2 norm."""
-    if env.rsl_rl_iteration < warmup_period:
+    if begin_iter is not None and env.rsl_rl_iteration < begin_iter:
         return torch.zeros(env.num_envs, device=env.device, dtype=torch.float32)
         
     # extract the used quantities (to enable type-hinting)
@@ -78,8 +92,10 @@ def position_tracking_l2_singleObj(env: ManagerBasedRLEnv, asset_cfg: SceneEntit
     mean_motorarm_pos_w_XY = motorarm_pos_w_XY.mean(dim=1) # (num_envs, 2)
     error = torch.norm(goal_pos_w - mean_motorarm_pos_w_XY, p=2, dim=1)
     rew = 1.0 - 0.33 * error
-    rew = torch.nan_to_num(rew, nan=-1.0)
-    rew = torch.clip(rew, min=-10.0)
+    rew = torch.nan_to_num(rew, nan=0.0)
+    rew = torch.clip(rew, min=0.0)
+    if ramp_width is not None and env.rsl_rl_iteration < begin_iter + ramp_width:
+        rew = rew * (env.rsl_rl_iteration - begin_iter) / ramp_width
     return rew
 
 def goal_reached_bonus(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:

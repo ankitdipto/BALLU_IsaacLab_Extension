@@ -50,8 +50,9 @@ def height_of_obstacle_in_front_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
     # We need to extract the difficulty index from the location of the env origin
     difficulty_indices = env_origins[:, 1] / obstacle_spacing_y
     # We need to extract the obstacle height from the difficulty index
-    obstacle_heights = [env.obstacle_height_list[int(difficulty_idx)] for difficulty_idx in difficulty_indices]
-    obstacle_heights_t = torch.tensor(obstacle_heights, device=env.device)
+    all_obstacle_heights_t = torch.tensor(env.obstacle_height_list, device=env.device, dtype=torch.float32)
+    difficulty_indices_int = difficulty_indices.long()
+    obstacle_heights_t = all_obstacle_heights_t[difficulty_indices_int]
     # Ensure shape is (num_envs, 1) for concatenation compatibility
     return obstacle_heights_t.unsqueeze(-1)
 

@@ -27,7 +27,7 @@ def run_training_experiment(
         max_iterations: int = 1200,
         seed: int = 42,
         device: str = "cuda:0"
-    ) -> tuple[bool, float]:
+    ) -> tuple[bool, float, str]:
     """
     Run training experiment and return success status and final reward.
     
@@ -38,7 +38,7 @@ def run_training_experiment(
         seed: Random seed for reproducibility
         device: Device to use for training
     Returns:
-        tuple: (success: bool, final_reward: float)
+        tuple: (success: bool, final_reward: float, log_dir: str)
     """
     train_script_path = f"{project_dir}/scripts/rsl_rl/train.py"
     cmd = [
@@ -47,10 +47,72 @@ def run_training_experiment(
         "--task", task,
         "--num_envs", "4096",
         "--max_iterations", str(max_iterations),
-        "--run_name", morph_id,
+        "--run_name", f"{morph_id}_seed{seed}",
         "--headless",
         "--seed", str(seed),
         "--device", device
+    ]
+
+    env = os.environ.copy()
+    env['BALLU_USD_REL_PATH'] = f"morphologies/{morph_id}/{morph_id}.usd"
+    env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
+    env['FORCE_GPU'] = '1'
+    
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env
+    )
+
+    try:
+        for line in process.stdout:
+            print(line, end='')
+            if line.startswith("EXP_DIR:"):
+                log_dir = line.split("EXP_DIR:")[1].strip()
+        process.wait(timeout=2 * 3600)  # 2 hours timeout
+    
+    except subprocess.TimeoutExpired:
+        print("Training exceeded 2-hour limit, terminating process")
+        process.kill()
+        process.wait()
+        return False, float('-inf'), ""
+
+    success = process.returncode == 0
+    
+    # Extract final reward from logs
+    ckpt_dict = torch.load(os.path.join(log_dir, "model_best.pt"))
+    best_crclm_level = ckpt_dict["best_crclm_level"]
+    
+    return success, best_crclm_level, log_dir
+
+def run_testing_experiment(
+        morph_id: str, 
+        task: str = "Isc-Vel-BALLU-1-obstacle",
+        load_run: str = "",
+        checkpoint: str = "model_best.pt",
+        num_envs: int = 1,
+        video_length: int = 399,
+        device: str = "cuda:0",
+        difficulty_level: int = 0
+    ) -> bool:
+    """
+    Run testing experiment and return success status and final reward.
+    """
+    test_script_path = f"{project_dir}/scripts/rsl_rl/play_single_obstacle.py"
+    cmd = [
+        sys.executable,
+        test_script_path,
+        "--task", task,
+        "--load_run", load_run,
+        "--checkpoint", checkpoint,
+        "--num_envs", str(num_envs),
+        "--video",
+        "--video_length", str(video_length),
+        "--device", device,
+        "--headless",
+        "--difficulty_level", str(difficulty_level),
     ]
 
     env = os.environ.copy()
@@ -75,16 +137,11 @@ def run_training_experiment(
         print("Training exceeded 2-hour limit, terminating process")
         process.kill()
         process.wait()
-        return False, float('-inf')
+        return False
 
     success = process.returncode == 0
     
-    # Extract final reward from logs
-    log_dir = f"{project_dir}/logs/rsl_rl/10.07.2025/{morph_id}"
-    ckpt_dict = torch.load(os.path.join(log_dir, "model_best.pt"))
-    best_crclm_level = ckpt_dict["best_crclm_level"]
-    
-    return success, best_crclm_level
+    return success
 
 def generate_morphology_variant(femur_ratio: float, total_leg_length: float = 0.75) -> tuple[str, str, str]:
     """
@@ -98,12 +155,13 @@ def generate_morphology_variant(femur_ratio: float, total_leg_length: float = 0.
         tuple: (urdf_path, usd_path, morphology_id) or (None, None, None) if failed
     """
     # Calculate individual segment lengths
+    ELECTRONICS_BOX_LEN = 0.06
     femur_length = total_leg_length * femur_ratio
-    tibia_length = total_leg_length * (1 - femur_ratio)
+    tibia_length = total_leg_length - femur_length - ELECTRONICS_BOX_LEN
     
     # Generate unique morphology ID
     timestamp = datetime.now().strftime("%b_%d_%H_%M_%S")
-    morph_id = f"femur_ratio_{femur_ratio:.3f}_{timestamp}"
+    morph_id = f"{timestamp}_balluElctx_FL_{femur_ratio:.3f}"
     
     # Prepare configuration
     config = {
@@ -210,7 +268,7 @@ def main():
         
         # Run training
         print(f"\nStarting training for ratio {ratio:.3f}")
-        success, best_crclm_level = run_training_experiment(
+        success, best_crclm_level, exp_dir = run_training_experiment(
             morph_id=morph_id,
             max_iterations=args.max_iterations,
             device=args.device,
@@ -218,14 +276,27 @@ def main():
             task=args.task
         )
         
+        # Run testing
+        print(f"\nStarting testing for ratio {ratio:.3f}")
+
+        run_name = exp_dir.split("/")[-1]
+        test_success = run_testing_experiment(
+            morph_id=morph_id,
+            device=args.device,
+            difficulty_level=int(best_crclm_level * 100),
+            load_run=run_name
+        )
+        
         # Store results
         results.append({
             "ratio": ratio,
             "status": "completed" if success else "failed",
+            "test_status": "completed" if test_success else "failed",
             "morphology_id": morph_id,
             "urdf_path": urdf_path,
             "usd_path": usd_path,
-            "best_crclm_level": best_crclm_level if success else None
+            "best_crclm_level": best_crclm_level if success else None,
+            "exp_dir": exp_dir
         })
         
         print(f"\nCompleted ratio {ratio:.3f} - Best Curriculum Level: {best_crclm_level:.4f}")

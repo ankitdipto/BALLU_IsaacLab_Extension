@@ -46,7 +46,8 @@ class LinkDensities:
     """
     PELVIS: Final[float] = 1805.5
     FEMUR: Final[float] = 329.3
-    TIBIA: Final[float] = 400 #1444.8
+    TIBIA: Final[float] = 329.3  # Updated to match femur density; previous was 400 
+    ELECTRONICS: Final[float] = 5900.0  # Maintains original leg mass
     MOTORARM: Final[float] = 1666.7
     BALLOON_EFFECTIVE: Final[float] = 0.706
 
@@ -60,10 +61,15 @@ class GeometryParams:
     
     # Limb dimensions (in meters)
     femur_length: float = 0.36501  # Upper leg length
-    tibia_length: float = 0.38485  # Lower leg length (to foot)
+    tibia_length: float = 0.32     # Effective tibia length (to electronics attachment)
     limb_radius: float = 0.005     # Leg cylinder radius
     hip_width: float = 0.11605     # Distance between hip joints (2 * 0.058025)
     foot_radius: float = 0.004     # Contact sphere radius
+    
+    # Electronics dimensions (in meters)
+    electronics_length: float = 0.06   # Electronics box length along Y-axis
+    electronics_width: float = 0.01    # Electronics box width along X-axis
+    electronics_height: float = 0.01   # Electronics box height along Z-axis
     
     # Pelvis/Body dimensions
     pelvis_height: float = 0.15    # Main body cylinder height
@@ -81,8 +87,12 @@ class GeometryParams:
     motorarm_height: float = 0.002  # Linkage arm height
     
     def get_total_leg_length(self) -> float:
-        """Calculate total leg length (femur + tibia)."""
-        return self.femur_length + self.tibia_length
+        """Calculate total leg length (femur + tibia + electronics)."""
+        return self.femur_length + self.tibia_length + self.electronics_length
+    
+    def get_effective_tibia_length(self) -> float:
+        """Get the effective tibia length (same as tibia_length, for clarity)."""
+        return self.tibia_length
     
     def get_femur_to_limb_ratio(self) -> float:
         """Calculate femur-to-total-leg ratio."""
@@ -108,10 +118,11 @@ class MassParams:
     
     # Link masses (in kg), computed automatically
     pelvis_mass: float
-    femur_mass: float    # Per leg
-    tibia_mass: float    # Per leg
-    balloon_mass: float  # Represents net buoyancy force
-    motorarm_mass: float # Per motorarm
+    femur_mass: float      # Per leg
+    tibia_mass: float      # Per leg
+    electronics_mass: float # Per leg
+    balloon_mass: float    # Represents net buoyancy force
+    motorarm_mass: float   # Per motorarm
     
     def get_total_mass(self) -> float:
         """Calculate total robot mass."""
@@ -119,13 +130,14 @@ class MassParams:
             self.pelvis_mass +
             2 * self.femur_mass +
             2 * self.tibia_mass +
+            2 * self.electronics_mass +
             self.balloon_mass +
             2 * self.motorarm_mass
         )
     
     def get_leg_mass(self) -> float:
         """Calculate mass of one complete leg."""
-        return self.femur_mass + self.tibia_mass + self.motorarm_mass
+        return self.femur_mass + self.tibia_mass + self.electronics_mass + self.motorarm_mass
 
 
 @dataclass
@@ -212,6 +224,7 @@ class BalluMorphology:
         pelvis_volume = math.pi * g.pelvis_radius**2 * g.pelvis_height
         femur_volume = math.pi * g.limb_radius**2 * g.femur_length
         tibia_volume = math.pi * g.limb_radius**2 * g.tibia_length
+        electronics_volume = g.electronics_width * g.electronics_length * g.electronics_height
         balloon_volume = math.pi * g.balloon_radius**2 * g.balloon_height
         motorarm_volume = g.motorarm_length * g.motorarm_width * g.motorarm_height
         
@@ -220,6 +233,7 @@ class BalluMorphology:
             pelvis_mass=pelvis_volume * DENSITIES.PELVIS,
             femur_mass=femur_volume * DENSITIES.FEMUR,
             tibia_mass=tibia_volume * DENSITIES.TIBIA,
+            electronics_mass=electronics_volume * DENSITIES.ELECTRONICS,
             balloon_mass=balloon_volume * DENSITIES.BALLOON_EFFECTIVE,
             motorarm_mass=motorarm_volume * DENSITIES.MOTORARM
         )
@@ -296,6 +310,14 @@ class BalluMorphology:
         if self.geometry.balloon_height <= 0:
             errors.append("balloon_height must be positive")
         
+        # Electronics constraints
+        if self.geometry.electronics_length <= 0:
+            errors.append("electronics_length must be positive")
+        if self.geometry.electronics_width <= 0:
+            errors.append("electronics_width must be positive")
+        if self.geometry.electronics_height <= 0:
+            errors.append("electronics_height must be positive")
+                    
         # Geometric ratios
         total_leg_length = self.geometry.get_total_leg_length()
         if total_leg_length < 0.1 or total_leg_length > 2.0:
@@ -313,6 +335,8 @@ class BalluMorphology:
             errors.append("Computed femur_mass must be positive")
         if self.mass.tibia_mass <= 0:
             errors.append("Computed tibia_mass must be positive")
+        if self.mass.electronics_mass <= 0:
+            errors.append("Computed electronics_mass must be positive")
         if self.mass.balloon_mass <= 0:
             errors.append("Computed balloon_mass must be positive")
         
@@ -405,10 +429,15 @@ class MorphologyParameterRanges:
     
     # Geometry ranges (min, max, default)
     femur_length: Tuple[float, float, float] = (0.2, 0.6, 0.36501)
-    tibia_length: Tuple[float, float, float] = (0.2, 0.6, 0.38485)
+    tibia_length: Tuple[float, float, float] = (0.2, 0.5, 0.32)
     limb_radius: Tuple[float, float, float] = (0.003, 0.01, 0.005)
     hip_width: Tuple[float, float, float] = (0.05, 0.20, 0.11605)
     foot_radius: Tuple[float, float, float] = (0.002, 0.01, 0.004)
+    
+    # Electronics ranges (min, max, default)
+    electronics_length: Tuple[float, float, float] = (0.03, 0.12, 0.06)
+    electronics_width: Tuple[float, float, float] = (0.005, 0.02, 0.01)
+    electronics_height: Tuple[float, float, float] = (0.005, 0.02, 0.01)
     
     pelvis_height: Tuple[float, float, float] = (0.08, 0.25, 0.15)
     pelvis_radius: Tuple[float, float, float] = (0.003, 0.01, 0.005)
@@ -453,6 +482,9 @@ class MorphologyParameterRanges:
                 limb_radius=ranges["limb_radius"][2],
                 hip_width=ranges["hip_width"][2],
                 foot_radius=ranges["foot_radius"][2],
+                electronics_length=ranges["electronics_length"][2],
+                electronics_width=ranges["electronics_width"][2],
+                electronics_height=ranges["electronics_height"][2],
                 pelvis_height=ranges["pelvis_height"][2],
                 pelvis_radius=ranges["pelvis_radius"][2],
                 balloon_radius=ranges["balloon_radius"][2],
@@ -500,12 +532,12 @@ def create_morphology_variant(
         if total_leg_length is not None:
             current_total = total_leg_length
         morph.geometry.femur_length = current_total * femur_to_limb_ratio
-        morph.geometry.tibia_length = current_total * (1 - femur_to_limb_ratio)
+        morph.geometry.tibia_length = current_total * (1 - femur_to_limb_ratio) - morph.geometry.electronics_length
     elif total_leg_length is not None:
         # Scale both proportionally
         current_ratio = morph.geometry.get_femur_to_limb_ratio()
         morph.geometry.femur_length = total_leg_length * current_ratio
-        morph.geometry.tibia_length = total_leg_length * (1 - current_ratio)
+        morph.geometry.tibia_length = total_leg_length * (1 - current_ratio) - morph.geometry.electronics_length
     
     # Handle arbitrary parameter overrides for geometry, joints, and contact
     for key, value in kwargs.items():

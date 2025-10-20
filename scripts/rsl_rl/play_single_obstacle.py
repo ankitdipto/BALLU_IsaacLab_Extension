@@ -21,8 +21,8 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
-parser.add_argument("--balloon_buoyancy_mass", type=float, default=0.24, 
-                   help="Buoyancy mass of the balloon")
+parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+                   help="Gravity compensation ratio")
 parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 
 # append RSL-RL cli arguments
@@ -114,13 +114,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
 
     # create debug directory for this run
-    play_folder = os.path.join(log_dir, "play", timestamp, f"{agent_cfg.load_checkpoint[:-3]}")
+    play_folder = os.path.join(log_dir, "play", timestamp, f"{agent_cfg.load_checkpoint[:-3]}_Ht{args_cli.difficulty_level}")
     os.makedirs(play_folder, exist_ok=True)
     print(f"[INFO] Saving plots to: {play_folder}")
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
-                   balloon_buoyancy_mass=args_cli.balloon_buoyancy_mass)
+                   gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
     
     # Shifting the env origins as per the difficulty level
     isaac_env = env.unwrapped
@@ -137,20 +137,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     EYE = (
         1.0 - 5.5/1.414, 
-        5.5/1.414 + inter_obstacle_spacing_y * (args_cli.difficulty_level - 1), 
-        2.0
+        5.5/1.414 + inter_obstacle_spacing_y * args_cli.difficulty_level, 
+        1.8
     )
     LOOKAT = (
         1.0,
-        inter_obstacle_spacing_y * (args_cli.difficulty_level - 1),
+        inter_obstacle_spacing_y * args_cli.difficulty_level,
         1.0
     )
 
-    isaac_env.cfg.viewer.eye = EYE
-    isaac_env.cfg.viewer.lookat = LOOKAT
-    
-    print(f"[DEBUG] Camera eye: {isaac_env.cfg.viewer.eye}")
-    print(f"[DEBUG] Camera lookat: {isaac_env.cfg.viewer.lookat}")
+    isaac_env.viewport_camera_controller.update_view_location(eye=EYE, lookat=LOOKAT)
     # wrap for video recording
     
     if args_cli.video:

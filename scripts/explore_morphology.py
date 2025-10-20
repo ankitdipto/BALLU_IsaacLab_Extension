@@ -7,7 +7,7 @@ import json
 import argparse
 import optuna
 from optuna.trial import TrialState
-from optuna.integration.wandb import WeightsAndBiasesCallback
+# from optuna.integration.wandb import WeightsAndBiasesCallback
 import torch
 
 # --- Path Setup ---
@@ -78,6 +78,58 @@ def run_training_experiment(
     return True, best_crclm_level, log_dir
 
 
+def run_testing_experiment(
+        morph_id: str, 
+        task: str = "Isc-Vel-BALLU-1-obstacle",
+        load_run: str = "",
+        checkpoint: str = "model_best.pt",
+        num_envs: int = 1,
+        video_length: int = 399,
+        device: str = "cuda:0",
+        difficulty_level: int = 0
+    ) -> bool:
+    """Run testing experiment for a trained morphology and return success status."""
+    test_script_path = f"{project_dir}/scripts/rsl_rl/play_single_obstacle.py"
+    cmd = [
+        sys.executable,
+        test_script_path,
+        "--task", task,
+        "--load_run", load_run,
+        "--checkpoint", checkpoint,
+        "--num_envs", str(num_envs),
+        "--video",
+        "--video_length", str(video_length),
+        "--device", device,
+        "--headless",
+        "--difficulty_level", str(difficulty_level),
+    ]
+
+    env = os.environ.copy()
+    env['BALLU_USD_REL_PATH'] = f"morphologies/{morph_id}/{morph_id}.usd"
+    env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
+    env['FORCE_GPU'] = '1'
+
+    process = subprocess.Popen(
+        cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=env
+    )
+
+    try:
+        for line in process.stdout:
+            print(line, end='')
+        process.wait(timeout=2 * 3600)
+    except subprocess.TimeoutExpired:
+        print(f"Testing timeout (2h), killing process")
+        process.kill()
+        process.wait()
+        return False
+
+    return process.returncode == 0
+
+
 def generate_morphology_from_params(sampled_config: dict, trial_number: int):
     """Generate morphology from sampled parameters and return (urdf_path, usd_path, morphology_id)."""
     print(f"\n[Trial {trial_number}] Generating morphology: {sampled_config['morphology_id']}")
@@ -109,26 +161,34 @@ def generate_morphology_from_params(sampled_config: dict, trial_number: int):
         return None, None, None
 
 
-def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) -> float:
+def objective(
+    trial: optuna.Trial,
+    max_iterations: int,
+    seed: int,
+    task: str,
+    device: str,
+    test_video_length: int,
+    test_num_envs: int,
+) -> float:
     """Optuna objective: samples parameters, generates morphology, trains, and returns best curriculum level."""
     print(f"\n{'='*80}\n[TRIAL {trial.number}]\n{'='*80}")
     
     # Sample parameters
-    # femur_length = trial.suggest_float("femur_length", 0.20, 0.45)
-    # tibia_length = trial.suggest_float("tibia_length", 0.20, 0.45)
-    femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
+    femur_length = trial.suggest_float("femur_length", 0.20, 0.45)
+    tibia_length = trial.suggest_float("tibia_length", 0.20, 0.40)
+    # femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
     spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
-    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.86, 0.90)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.80, 0.87)
     
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
-    morph_id = f"trial{trial.number:02d}_FLr{femur_to_limb_ratio:.3f}_knKd{knee_damping:.3f}_spD{spring_damping:.3f}_GCR{gravity_comp_ratio:.3f}"
+    morph_id = f"trial{trial.number:02d}_f{femur_length:.3f}_t{tibia_length:.3f}_knKd{knee_damping:.3f}_spD{spring_damping:.3f}_GCR{gravity_comp_ratio:.3f}"
 
     sampled_config = {
         "morphology_id": morph_id,
-        # "femur_length": femur_length,
-        # "tibia_length": tibia_length,
-        "femur_to_limb_ratio": femur_to_limb_ratio
+        "femur_length": femur_length,
+        "tibia_length": tibia_length
+        # "femur_to_limb_ratio": femur_to_limb_ratio
     }
     
     # Generate morphology
@@ -162,6 +222,24 @@ def objective(trial: optuna.Trial, max_iterations: int, seed: int, task: str) ->
     trial.set_user_attr("usd_path", usd_path)
     trial.set_user_attr("best_crclm_level", best_crclm_level)
     trial.set_user_attr("log_dir", log_dir)
+
+    # Run testing for this morphology
+    run_name = log_dir.split("/")[-1] if log_dir else ""
+    difficulty = int(best_crclm_level * 100) - 1 if best_crclm_level > 0 else 0
+    print(f"[Trial {trial.number}] Starting testing (difficulty={difficulty})...")
+    test_success = run_testing_experiment(
+        morph_id=final_morph_id,
+        task=task,
+        load_run=run_name,
+        checkpoint="model_best.pt",
+        num_envs=test_num_envs,
+        video_length=test_video_length,
+        device=device,
+        difficulty_level=difficulty,
+    )
+    print(f"[Trial {trial.number}] Testing {'SUCCESS' if test_success else 'FAILED'}")
+    trial.set_user_attr("test_success", test_success)
+    trial.set_user_attr("test_difficulty_level", difficulty)
     
     return best_crclm_level
 
@@ -177,6 +255,9 @@ def main():
     parser.add_argument("--study_name", type=str, default="TPE", help="Study name (default: TPE)")
     parser.add_argument("--storage", type=str, default=None, help="Database storage path (default: sqlite:///logs/optuna/TPE.db)")
     parser.add_argument("--resume", action="store_true", default=False, help="Resume from existing study (default: False)")
+    parser.add_argument("--device", type=str, default="cuda:0", help="Device for testing/play (default: cuda:0)")
+    parser.add_argument("--test_video_length", type=int, default=399, help="Test video length in frames (default: 399)")
+    parser.add_argument("--test_num_envs", type=int, default=1, help="Number of envs for testing (default: 1)")
     
     args = parser.parse_args()
     
@@ -185,6 +266,9 @@ def main():
     MAX_ITERATIONS = args.max_iterations
     SEED = args.seed
     TASK = args.task
+    DEVICE = args.device
+    TEST_VIDEO_LENGTH = args.test_video_length
+    TEST_NUM_ENVS = args.test_num_envs
     
     timestamp = datetime.now().strftime("%b_%d_%H_%M_%S")
     STUDY_NAME = args.study_name if args.resume else f"{timestamp}_{args.study_name}"
@@ -206,23 +290,23 @@ def main():
         storage=STORAGE,
         direction="maximize",
         load_if_exists=args.resume,
-        sampler=optuna.samplers.TPESampler(seed=42)
+        sampler=optuna.samplers.TPESampler(seed=SEED)
     )
     
-    wandb_cb = WeightsAndBiasesCallback(
-        wandb_kwargs={"project": "BALLU_MorphOpt_1_Obstacle", "entity": "ankitdipto"},
-        as_multirun=True,
-        metric_name="best_crclm_level"
-    )
+    # wandb_cb = WeightsAndBiasesCallback(
+    #     wandb_kwargs={"project": STUDY_NAME, "entity": "ankitdipto"},
+    #     as_multirun=True,
+    #     metric_name="best_crclm_level"
+    # )
 
     # Run optimization with lambda to pass additional parameters
     try:
         study.optimize(
-            lambda trial: objective(trial, MAX_ITERATIONS, SEED, TASK),
+            lambda trial: objective(trial, MAX_ITERATIONS, SEED, TASK, DEVICE, TEST_VIDEO_LENGTH, TEST_NUM_ENVS),
             n_trials=N_TRIALS, 
             show_progress_bar=True, 
             catch=(Exception,),
-            callbacks=[wandb_cb]
+            # callbacks=[wandb_cb]
         )
     except KeyboardInterrupt:
         print("\nOptimization interrupted by user.")

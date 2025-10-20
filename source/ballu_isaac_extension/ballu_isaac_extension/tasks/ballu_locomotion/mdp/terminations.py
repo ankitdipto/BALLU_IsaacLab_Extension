@@ -26,6 +26,9 @@ def invalid_state(env: ManagerBasedRLEnv, max_root_speed: float = 10.0) -> torch
     joint_velocities_are_finite = torch.isfinite(robot.data.joint_vel).all(dim=1)
     root_position_is_finite = torch.isfinite(robot.data.root_pos_w).all(dim=1)
     root_quaternion_is_finite = torch.isfinite(robot.data.root_quat_w).all(dim=1)
+    body_link_positions_are_finite = torch.isfinite(robot.data.body_link_pos_w).all(dim = (1, 2))
+    body_link_quaternions_are_finite = torch.isfinite(robot.data.body_link_quat_w).all(dim = (1, 2))
+    body_link_velocities_are_finite = torch.isfinite(robot.data.body_link_vel_w).all(dim = (1, 2))
 
     # Root linear speed threshold in world frame
     root_linear_speed_w = torch.linalg.norm(robot.data.root_lin_vel_w, dim=1)
@@ -37,6 +40,9 @@ def invalid_state(env: ManagerBasedRLEnv, max_root_speed: float = 10.0) -> torch
         | (~joint_velocities_are_finite)
         | (~root_position_is_finite)
         | (~root_quaternion_is_finite)
+        | (~body_link_positions_are_finite)
+        | (~body_link_quaternions_are_finite)
+        | (~body_link_velocities_are_finite)
         | (root_speed_exceeds_limit)
     )
 
