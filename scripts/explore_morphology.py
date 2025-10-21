@@ -89,8 +89,8 @@ def run_testing_experiment(
         difficulty_level: int = 0,
         knee_damping: float = 0.08,
         spring_damping: float = 0.01,
-        gravity_compensation_ratio: float = 0.84
-    ) -> bool:
+        gravity_comp_ratio: float = 0.84
+    ) -> tuple[bool, str]:
     """Run testing experiment for a trained morphology and return success status."""
     test_script_path = f"{project_dir}/scripts/rsl_rl/play_single_obstacle.py"
     cmd = [
@@ -105,7 +105,7 @@ def run_testing_experiment(
         "--device", device,
         "--headless",
         "--difficulty_level", str(difficulty_level),
-        "--gravity_compensation_ratio", str(gravity_compensation_ratio),
+        "--gravity_compensation_ratio", str(gravity_comp_ratio),
         f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
         f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}",
     ]
@@ -131,9 +131,10 @@ def run_testing_experiment(
         print(f"Testing timeout (2h), killing process")
         process.kill()
         process.wait()
-        return False
+        return False, ""
 
-    return process.returncode == 0
+    test_command = f"env BALLU_USD_REL_PATH={env['BALLU_USD_REL_PATH']}" + " " + ' '.join(cmd)
+    return process.returncode == 0, test_command
 
 
 def generate_morphology_from_params(sampled_config: dict, trial_number: int):
@@ -231,9 +232,9 @@ def objective(
 
     # Run testing for this morphology
     run_name = log_dir.split("/")[-1] if log_dir else ""
-    difficulty = int(best_crclm_level * 100) if best_crclm_level > 0 else 0
+    difficulty = int(best_crclm_level * 100) - 1 if best_crclm_level > 0 else 0
     print(f"[Trial {trial.number}] Starting testing (difficulty={difficulty})...")
-    test_success = run_testing_experiment(
+    test_success, test_command = run_testing_experiment(
         morph_id=final_morph_id,
         task=task,
         load_run=run_name,
@@ -247,6 +248,17 @@ def objective(
         gravity_comp_ratio=gravity_comp_ratio
     )
     print(f"[Trial {trial.number}] Testing {'SUCCESS' if test_success else 'FAILED'}")
+    # Write test_command to a shell script in log_dir and make it executable.
+    script_path = os.path.join(log_dir, f"rerun_test_{trial.number}.sh")
+    try:
+        with open(script_path, "w") as f:
+            f.write("#!/bin/bash\n")
+            f.write(test_command + "\n")
+        os.chmod(script_path, 0o755)
+        print(f"[Trial {trial.number}] Wrote test rerun script to {script_path}. Run it to rerun the test.")
+    except Exception as e:
+        print(f"[Trial {trial.number}] WARNING: Failed to write rerun_test_{trial.number}.sh: {e}")
+        
     trial.set_user_attr("test_success", test_success)
     trial.set_user_attr("test_difficulty_level", difficulty)
     

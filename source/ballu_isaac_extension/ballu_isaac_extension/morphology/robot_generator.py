@@ -34,7 +34,7 @@ try:
 except ImportError:
     from ballu_morphology_config import BalluMorphology
 
-BALLU_ASSETS_DIR = "/home/asinha389/shared/BALLU_Project/ballu_isclb_extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets"
+from .constants import BALLU_ASSETS_DIR
 
 @dataclass
 class InertiaProperties:
