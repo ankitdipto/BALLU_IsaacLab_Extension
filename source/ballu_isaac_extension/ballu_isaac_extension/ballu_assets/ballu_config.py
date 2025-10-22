@@ -48,7 +48,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.4), 
+        pos=(0.0, 0.0, 1.1), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
@@ -90,6 +90,82 @@ BALLU_REAL_CFG = ArticulationCfg(
 )
 """Configuration for the real BALLU robot."""
 
+BALLU_REAL_HETERO_CFG = ArticulationCfg(
+    spawn=sim_utils.MultiUsdFileCfg(
+        usd_path=[
+            os.path.join(
+                root_usd_path, 
+                "morphologies", 
+                "trial30_FLr0.578_knKd0.103_spD0.035_GCR0.891", 
+                "trial30_FLr0.578_knKd0.103_spD0.035_GCR0.891.usd"
+            ),
+            os.path.join(
+                root_usd_path, 
+                "morphologies", 
+                "trial36_FLr0.641_knKd0.062_spD0.023_GCR0.891",
+                "trial36_FLr0.641_knKd0.062_spD0.023_GCR0.891.usd"
+            ),
+        ],
+        random_choice=True,
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            rigid_body_enabled=True,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+            max_depenetration_velocity=100.0,
+            enable_gyroscopic_forces=True,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False,
+            solver_position_iteration_count=4,
+            solver_velocity_iteration_count=0,
+            sleep_threshold=0.005,
+            stabilization_threshold=0.001,
+            fix_root_link=False
+        ),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(0.0, 0.0, 1.1), 
+        # rot=(0.9238795, 0.0, 0.0, 0.3826834),
+        joint_pos={"NECK": 0.0, 
+                   "HIP_LEFT": degree_to_radian(1),
+                   "HIP_RIGHT": degree_to_radian(1),
+                   "KNEE_LEFT": degree_to_radian(27.35),
+                   "KNEE_RIGHT": degree_to_radian(27.35),
+                   "MOTOR_LEFT": degree_to_radian(10),
+                   "MOTOR_RIGHT": degree_to_radian(10)}
+    ),
+    actuators={
+        # Define actuators for MOTOR joints to accept position commands from action space
+        "motor_actuators": ImplicitActuatorCfg(
+            joint_names_expr=["MOTOR_LEFT", "MOTOR_RIGHT"],
+            effort_limit_sim=1.44 * 9.81 * 1e-2, # 0.1412 Nm
+            velocity_limit_sim=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
+            stiffness=1.0,
+            damping=0.01,
+        ),
+        # Define effort-control actuator for KNEE joints
+        "knee_effort_actuators": SpringPDActuatorCfg(
+            joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
+            effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
+            velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
+            spring_coeff=0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_damping=1.0e-2,
+            spring_preload=degree_to_radian(180 - 135 + 27.35),
+            pd_p=1.0, #1.0,
+            pd_d=0.08, #0.02
+            stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
+            damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
+        ),
+        # Keep other joints passive
+        "other_passive_joints": ImplicitActuatorCfg(
+            joint_names_expr=["NECK", "HIP_LEFT", "HIP_RIGHT"], 
+            stiffness=0.0,
+            damping=0.001,
+        ),
+    },
+)
+"""Configuration for the real BALLU robot."""
 # BALLU_CFG = ArticulationCfg(
 #     spawn=sim_utils.UsdFileCfg(
 #         usd_path="/home/asinha389/Documents/Projects/MorphologyOPT/BALLU_IsaacLab_Extension/source/ballu_isaac_extension/ballu_isaac_extension/ballu_assets/robots/original/original.usd",

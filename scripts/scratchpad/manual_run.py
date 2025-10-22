@@ -45,6 +45,7 @@ import isaaclab.utils.math as math_utils
 from ballu_isaac_extension.tasks.ballu_locomotion.flat_env_cfg import BalluFlatEnvCfg
 from ballu_isaac_extension.tasks.ballu_locomotion.rough_env_cfg import BalluRoughEnvCfg
 from ballu_isaac_extension.tasks.ballu_locomotion.single_obstacle_env_cfg import BalluSingleObstacleEnvCfg
+from ballu_isaac_extension.tasks.ballu_locomotion.mdp.geometry_utils import get_robot_dimensions
 from action_generators import *
 import os
 import isaaclab.sim as sim_utils
@@ -216,19 +217,50 @@ def main():
             # if terminated.any() or truncated.any():
             #     print(f"[INFO]: Environments terminated after {count} steps.")
             #     break
-            # Print obstacle size (world-space) once using raw USD API
+            # Print robot geometry using new utilities
             if count == 1:
                 try:
-                    stage = omni.usd.get_context().get_stage()
-                    femur_left_cylinder_env0 = "/World/envs/env_0/Robot/FEMUR_LEFT/collisions/mesh_0/cylinder"
-                    prim = stage.GetPrimAtPath(femur_left_cylinder_env0)
-                    print(prim)
-                    print("Femur left cylinder prim path: ", prim.GetPath())
-                    geom = UsdGeom.Cylinder(prim)
-                    print("Femur left cylinder height: ", geom.GetHeightAttr().Get())
-                    print("Femur left cylinder radius: ", geom.GetRadiusAttr().Get())
+                    # Extract robot dimensions using new geometry utilities
+                    dims = get_robot_dimensions(0)
+                    
+                    print("=== ROBOT GEOMETRY (via geometry_utils) ===")
+                    print(f"Pelvis cylinder - radius: {dims.pelvis.radius.item():.6f}, height: {dims.pelvis.height.item():.6f}")
+                    print(f"Femur left cylinder - radius: {dims.femur_left.radius.item():.6f}, height: {dims.femur_left.height.item():.6f}")
+                    print(f"Femur right cylinder - radius: {dims.femur_right.radius.item():.6f}, height: {dims.femur_right.height.item():.6f}")
+                    
+                    print(f"Tibia left cylinder - radius: {dims.tibia_left.cylinder.radius.item():.6f}, height: {dims.tibia_left.cylinder.height.item():.6f}")
+                    print(f"Tibia left box - size: {dims.tibia_left.box.size.squeeze()}")
+                    print(f"Tibia left sphere - radius: {dims.tibia_left.sphere.radius.item():.6f}")
+                    
+                    print(f"Tibia right cylinder - radius: {dims.tibia_right.cylinder.radius.item():.6f}, height: {dims.tibia_right.cylinder.height.item():.6f}")
+                    print(f"Tibia right box - size: {dims.tibia_right.box.size.squeeze()}")
+                    print(f"Tibia right sphere - radius: {dims.tibia_right.sphere.radius.item():.6f}")
+                    
+                    # Demonstrate batch extraction for multiple environments (if available)
+                    if args_cli.num_envs > 1:
+                        print("\n=== BATCH GEOMETRY EXTRACTION ===")
+                        batch_dims = get_robot_dimensions(slice(0, min(3, args_cli.num_envs)))
+                        print(f"Batch pelvis radii: {batch_dims.pelvis.radius}")
+                        print(f"Batch tibia left sphere radii: {batch_dims.tibia_left.sphere.radius}")
+                    
+                    # Demonstrate concatenation for RL observations
+                    print("\n=== RL OBSERVATION FEATURES ===")
+                    obs_features = torch.cat([
+                        dims.pelvis.radius,
+                        dims.femur_left.radius,
+                        dims.femur_right.radius,
+                        dims.tibia_left.cylinder.height,
+                        dims.tibia_right.cylinder.height,
+                        dims.tibia_left.sphere.radius,
+                        dims.tibia_right.sphere.radius
+                    ], dim=-1)
+                    print(f"Concatenated geometry features: {obs_features}")
+                    print(f"Feature shape: {obs_features.shape}")
+
                 except Exception as e:
-                    print(f"[WARN] Failed to query obstacle size via USD: {e}")
+                    print(f"[ERROR] Failed to extract robot geometry: {e}")
+                    import traceback
+                    traceback.print_exc()
             #     print("Obstacle height list: ", env.unwrapped.obstacle_height_list)
             # if count % env.max_episode_length == 0:
             #     env.unwrapped.scene._default_env_origins = torch.rand(env.unwrapped.num_envs, 3, device=env.device) * 6.0

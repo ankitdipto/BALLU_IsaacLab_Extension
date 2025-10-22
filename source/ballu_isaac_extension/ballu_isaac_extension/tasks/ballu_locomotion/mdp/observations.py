@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from isaaclab.assets.articulation.articulation import Articulation
 from isaaclab.sensors.contact_sensor.contact_sensor import ContactSensor
 from isaaclab.managers import SceneEntityCfg
+from .geometry_utils import *
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -14,7 +15,7 @@ if TYPE_CHECKING:
 """
 Root state.
 """
-
+MORPH_VECTOR: torch.Tensor | None = None
 
 def feet_air_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces")) -> torch.Tensor:
     """Feet air time"""
@@ -69,3 +70,35 @@ def distance_of_limbs_from_obstacle_priv(env: ManagerBasedRLEnv, asset_cfg: Scen
     obstacle_edge_x_repeated = obstacle_edge_x.unsqueeze(-1).repeat(1, 2)  # (num_envs, 2)
     tibia_dist_from_obstacle = obstacle_edge_x_repeated - tibia_pos_w_x  # (num_envs, 2)
     return tibia_dist_from_obstacle
+
+def goal_location_w_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Goal location"""
+    # extract the used quantities (to enable type-hinting)
+    env_origins = env.scene.env_origins
+    # The goal is at x = 2.0m from the env origin
+    goal_pos_w = env_origins[:, :2] + torch.tensor([2.0, 0.0], device=env.device, dtype=env_origins.dtype) # shape: (num_envs, 2)
+    goal_pos_w = goal_pos_w - env_origins[:, :2] # shape: (num_envs, 2) - subtract the env origin from the goal position
+    # Ensure shape is (num_envs, 2) for concatenation compatibility
+    assert goal_pos_w.shape == (env.num_envs, 2), f"Goal position shape mismatch, expected (num_envs, 2), got {goal_pos_w.shape}"
+    return goal_pos_w
+
+def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Morphology vector"""
+    # extract the used quantities (to enable type-hinting)
+    global MORPH_VECTOR
+    if MORPH_VECTOR is None:
+        all_dims = get_robot_dimensions(env_indices=slice(0, env.num_envs))
+        morphology_vector = torch.cat([
+            all_dims.pelvis.height.unsqueeze(-1),
+            all_dims.femur_left.height.unsqueeze(-1),
+            all_dims.femur_right.height.unsqueeze(-1),
+            all_dims.tibia_left.cylinder.height.unsqueeze(-1),
+            all_dims.tibia_right.cylinder.height.unsqueeze(-1),
+            all_dims.tibia_left.box.size,
+            all_dims.tibia_right.box.size,
+            all_dims.tibia_left.sphere.radius.unsqueeze(-1),
+            all_dims.tibia_right.sphere.radius.unsqueeze(-1)
+        ], dim=-1).to(env.device)
+        MORPH_VECTOR = morphology_vector
+    # print(f"Morphology vector shape: {MORPH_VECTOR.shape}")
+    return MORPH_VECTOR
