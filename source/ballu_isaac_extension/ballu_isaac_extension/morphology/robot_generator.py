@@ -167,8 +167,8 @@ class BalluRobotGenerator:
         morphology: BalluMorphology,
         mesh_package: str = "package://urdf/meshes",
         use_visual_meshes: bool = True,
-        urdf_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "old", "urdf", "urdf", "morphologies"),
-        usd_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "robots", "morphologies")
+        urdf_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "old", "urdf", "urdf", "morphologies", "10.24.2025"),
+        usd_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "robots", "morphologies", "10.24.2025")
     ):
         """
         Initialize robot generator.

@@ -151,6 +151,9 @@ class ObservationsCfg:
         # How far are the limbs from the obstacle?
         limb_dist_from_obstacle = ObsTerm(func=mdp.distance_of_limbs_from_obstacle_priv)
 
+        # Where is the goal wrt environment origin i.e. environment frame?
+        goal_pos_w = ObsTerm(func=mdp.goal_location_w_priv)
+
         # What action did the robot take last?
         last_action = ObsTerm(func=mdp.last_action)
 
