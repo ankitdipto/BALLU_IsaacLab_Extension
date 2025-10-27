@@ -326,6 +326,51 @@ def write_velocity_statistics(df, rolling_data, output_dir):
     
     print(f"[INFO] Velocity statistics saved to: {stats_file_path}")
 
+def plot_contact_force_data(df, output_dir):
+    """Plot contact force data."""
+    fig_X, ax_X = plt.subplots(figsize=(12, 8))
+    fig_Y, ax_Y = plt.subplots(figsize=(12, 8))
+    fig_Z, ax_Z = plt.subplots(figsize=(12, 8))
+    time_steps = range(len(df))
+
+    # Suppress very small values (abs < 0.01) to zero for better plot visibility
+    cf_left_x = df['CONTACT_FORCE_LEFT_X'].where(df['CONTACT_FORCE_LEFT_X'].abs() >= 0.001, 0)
+    cf_right_x = df['CONTACT_FORCE_RIGHT_X'].where(df['CONTACT_FORCE_RIGHT_X'].abs() >= 0.001, 0)
+    ax_X.plot(time_steps, cf_left_x, label='Contact Force Left X', color='red')
+    ax_X.plot(time_steps, cf_right_x, label='Contact Force Right X', color='blue')
+    ax_X.set_xlabel('Time Step')
+    ax_X.set_ylabel('Contact Force (N)')
+    ax_X.set_title('Contact Force X Component')
+    ax_X.legend()
+    ax_X.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
+    fig_X.tight_layout()
+    output_path = os.path.join(output_dir, 'contact_force_x2_plot.png')
+    fig_X.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"[INFO] Contact force X plot saved to: {output_path}")
+
+    ax_Y.plot(time_steps, df['CONTACT_FORCE_LEFT_Y'], label='Contact Force Left Y', color='red')
+    ax_Y.plot(time_steps, df['CONTACT_FORCE_RIGHT_Y'], label='Contact Force Right Y', color='blue')
+    ax_Y.set_xlabel('Time Step')
+    ax_Y.set_ylabel('Contact Force (N)')
+    ax_Y.set_title('Contact Force Y Component')
+    ax_Y.legend()
+    ax_Y.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
+    fig_Y.tight_layout()
+    output_path = os.path.join(output_dir, 'contact_force_y2_plot.png')
+    fig_Y.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"[INFO] Contact force Y plot saved to: {output_path}")
+
+    ax_Z.plot(time_steps, df['CONTACT_FORCE_LEFT_Z'], label='Contact Force Left Z', color='red')
+    ax_Z.plot(time_steps, df['CONTACT_FORCE_RIGHT_Z'], label='Contact Force Right Z', color='blue')
+    ax_Z.set_xlabel('Time Step')
+    ax_Z.set_ylabel('Contact Force (N)')
+    ax_Z.set_title('Contact Force Z Component')
+    ax_Z.legend()
+    ax_Z.grid(True, alpha=0.3, linestyle='-', linewidth=0.8)
+    fig_Z.tight_layout()
+    output_path = os.path.join(output_dir, 'contact_force_z2_plot.png')
+    fig_Z.savefig(output_path, dpi=300, bbox_inches='tight')
+    print(f"[INFO] Contact force Z plot saved to: {output_path}")
 
 def print_data_summary(df):
     """Print a summary of the loaded data."""
@@ -448,6 +493,7 @@ Examples:
         if not has_joint_data and not has_velocity_data:
             print("[WARN] No recognized data columns found. Please check your CSV file format.")
         
+        plot_contact_force_data(df, str(output_dir))
         print("\n✓ All available analyses completed successfully!")
         
     except Exception as e:

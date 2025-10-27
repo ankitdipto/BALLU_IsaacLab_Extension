@@ -88,10 +88,11 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     # )
 
     # contact sensors at feet
-    #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
-    #                                  history_length=3, 
-    #                                  track_air_time=True)
-
+    contact_forces_tibia = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
+        update_period=0.05, # 20 Hz
+        debug_vis=True
+    )
 
     # Generated obstacles are added as individual AssetBaseCfg entries in __post_init__
     obstacles = None
@@ -152,7 +153,7 @@ class ObservationsCfg:
         limb_dist_from_obstacle = ObsTerm(func=mdp.distance_of_limbs_from_obstacle_priv)
 
         # Where is the goal wrt environment origin i.e. environment frame?
-        goal_pos_w = ObsTerm(func=mdp.goal_location_w_priv)
+        # goal_pos_w = ObsTerm(func=mdp.goal_location_w_priv) TODO: Uncomment this after reproducibility tasks are over.
 
         # What action did the robot take last?
         last_action = ObsTerm(func=mdp.last_action)

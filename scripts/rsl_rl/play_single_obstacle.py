@@ -200,6 +200,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     actions_history = []
     comp_torq_history = []
     applied_torq_history = []
+    contact_forces_tibia_history = []
     #all_rewards = []
 
     # Get robots_data and tibia indices once before simulation loop
@@ -241,6 +242,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 base_vel = robots_data.root_lin_vel_b.clone().detach().cpu()
                 comp_torq = robots_data.computed_torque.clone().detach().cpu()
                 applied_torq = robots_data.applied_torque.clone().detach().cpu()
+                contact_forces_tibia = isaac_env.scene["contact_forces_tibia"].data.net_forces_w.clone().detach().cpu()
                 # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
                 # print("Torques from play.py")
                 # print(f"Computed torque: {comp_torq.cpu().numpy()}")
@@ -303,6 +305,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                 actions_history.append(actions)
                 comp_torq_history.append(comp_torq)
                 applied_torq_history.append(applied_torq)
+                contact_forces_tibia_history.append(contact_forces_tibia)
             if args_cli.video:
                 # Exit the play loop after recording one video
                 if timestep == args_cli.video_length:
@@ -330,6 +333,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     applied_torq_hist_tch = torch.stack(applied_torq_history)
     # Toe endpoints history if available
     toe_endpoints_world_hist_tch = torch.stack(toe_endpoints_world_history)
+    contact_forces_tibia_hist_tch = torch.stack(contact_forces_tibia_history)
     # tibia_endpoints_hist_tch = None
     #if len(toe_endpoints_world_history) > 0:
 
@@ -352,6 +356,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     base_vel_data = base_vel_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 3)
     comp_torq_data = comp_torq_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
     applied_torq_data = applied_torq_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 7)
+    contact_forces_tibia_data = contact_forces_tibia_hist_tch[:, env_idx, :].cpu().numpy()  # Shape: (num_timesteps, 2, 3)
     
     left_knee_idx = robot_jnt_names.index("KNEE_LEFT")
     right_knee_idx = robot_jnt_names.index("KNEE_RIGHT")
@@ -376,7 +381,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         'COMP_TORQ_LEFT_KNEE': comp_torq_data[:, left_knee_idx],
         'COMP_TORQ_RIGHT_KNEE': comp_torq_data[:, right_knee_idx],
         'APPLIED_TORQ_LEFT_KNEE': applied_torq_data[:, left_knee_idx],
-        'APPLIED_TORQ_RIGHT_KNEE': applied_torq_data[:, right_knee_idx]
+        'APPLIED_TORQ_RIGHT_KNEE': applied_torq_data[:, right_knee_idx],
+        'CONTACT_FORCE_LEFT_X': contact_forces_tibia_data[:, 0, 0],
+        'CONTACT_FORCE_LEFT_Y': contact_forces_tibia_data[:, 0, 1],
+        'CONTACT_FORCE_LEFT_Z': contact_forces_tibia_data[:, 0, 2],
+        'CONTACT_FORCE_RIGHT_X': contact_forces_tibia_data[:, 1, 0],
+        'CONTACT_FORCE_RIGHT_Y': contact_forces_tibia_data[:, 1, 1],
+        'CONTACT_FORCE_RIGHT_Z': contact_forces_tibia_data[:, 1, 2],
     }
     
     df = pd.DataFrame(csv_data)
