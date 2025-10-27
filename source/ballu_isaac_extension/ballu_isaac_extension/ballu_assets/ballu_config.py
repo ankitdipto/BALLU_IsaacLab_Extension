@@ -23,7 +23,7 @@ def get_robot_usd_path():
         return morphology_usd_path
     else:
         # Default to original robot
-        default_path = os.path.join(root_usd_path, "original", "original")
+        default_path = os.path.join(root_usd_path, "morphologies", "10.28.2025", "reprod_asset_FL_0.64", "reprod_asset_FL_0.64.usd")
         print(f"🤖 Using default robot USD: {default_path}")
         return default_path
 
@@ -48,7 +48,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.1), 
+        pos=(0.0, 0.0, 0.7), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
@@ -72,11 +72,11 @@ BALLU_REAL_CFG = ArticulationCfg(
             joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
             effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
             velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
-            spring_coeff=0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_coeff=0.0107, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
             spring_damping=1.0e-2,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
-            pd_p=1.0, #0.9, #1.0,
-            pd_d=0.08, #0.02
+            pd_p=0.4, #1.0,
+            pd_d=0.06, #0.02
             stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
             damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
         ),

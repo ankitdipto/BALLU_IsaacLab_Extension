@@ -32,13 +32,13 @@ def forward_velocity_x(
     return Vx
 
 # 2\left(e^{2x}-1\right)
-def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+def feet_z_pos_1_obstacle_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Reward feet z position."""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
     tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
     tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
-    feet_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], 
+    feet_offset_b = torch.tensor([0.0, 0.21 + 0.06 + 0.004, 0.0], 
                                 device=env.device, dtype=tibia_pos_w.dtype)
     feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
     pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
@@ -65,6 +65,27 @@ def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityC
                                         0.0, 
                                         torch.exp(slope * min_feet_z_pos_w) - 1)
     # rew = torch.exp(slope * min_feet_z_pos_w) - 1
+    rew = torch.nan_to_num(rew, nan=0.0)
+    # assert rew has no nan
+    assert not torch.isnan(rew).any()
+    return rew
+
+def feet_z_pos_flat_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward feet z position."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
+    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
+    tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
+    feet_offset_b = torch.tensor([0.0, 0.21 + 0.06 + 0.004, 0.0], 
+                                device=env.device, dtype=tibia_pos_w.dtype)
+    feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
+    pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+    feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
+    feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
+
+    min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
+    
+    rew = torch.exp(slope * min_feet_z_pos_w) - 1
     rew = torch.nan_to_num(rew, nan=0.0)
     # assert rew has no nan
     assert not torch.isnan(rew).any()

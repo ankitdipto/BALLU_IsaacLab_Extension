@@ -192,7 +192,7 @@ class RewardsCfg:
 
     # Shaping reward - jump to clear the obstacle
     high_jump = RewTerm(
-        func=mdp.feet_z_pos_exp,
+        func=mdp.feet_z_pos_1_obstacle_exp,
         weight=1.0,
         params={
             "slope": 1.73

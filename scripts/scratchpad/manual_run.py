@@ -152,11 +152,11 @@ def main():
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
-            actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
-            # if count % env.max_episode_length <= 150:
-            #     actions = both_legs_theta(theta=0.1, num_envs=args_cli.num_envs)
-            # else:
-            #     actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
+            if count % env.max_episode_length <= 150:
+                actions = both_legs_0(num_envs=args_cli.num_envs)
+            else:
+                actions = both_legs_1(num_envs=args_cli.num_envs)
             # ---- Best action sequence for jumping ----
             # if count % 140 <= 80:
             #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)

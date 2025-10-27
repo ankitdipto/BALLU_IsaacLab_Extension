@@ -220,13 +220,13 @@ class RewardsCfg:
     )
 
     # Reward to encourage high jump
-    # high_jump = RewTerm(
-    #     func=mdp.feet_z_pos_exp,
-    #     weight=1.0,
-    #     params={
-    #         "slope": 1.73
-    #     }
-    # )
+    high_jump = RewTerm(
+        func=mdp.feet_z_pos_flat_exp,
+        weight=1.0,
+        params={
+            "slope": 1.73
+        }
+    )
 
     track_lin_vel_xy_world_exp = RewTerm(
         func=mdp.track_lin_vel_xy_world_exp_ballu, 

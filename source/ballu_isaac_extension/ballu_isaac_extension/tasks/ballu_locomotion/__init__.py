@@ -8,7 +8,7 @@ from . import agents
 
 # Register the BALLU environments
 gym.register(
-    id="Isc-Vel-BALLU-encoder",
+    id="Isc-BALLU-walk-flat",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
