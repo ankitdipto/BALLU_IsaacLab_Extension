@@ -34,7 +34,7 @@ try:
 except ImportError:
     from ballu_morphology_config import BalluMorphology
 
-from .constants import BALLU_ASSETS_DIR
+from .constants import BALLU_ASSETS_DIR, NEXT_LAB_DATE
 
 @dataclass
 class InertiaProperties:
@@ -167,8 +167,8 @@ class BalluRobotGenerator:
         morphology: BalluMorphology,
         mesh_package: str = "package://urdf/meshes",
         use_visual_meshes: bool = True,
-        urdf_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "old", "urdf", "urdf", "morphologies", "10.24.2025"),
-        usd_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "robots", "morphologies", "10.24.2025")
+        urdf_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "old", "urdf", "urdf", "morphologies", NEXT_LAB_DATE),
+        usd_output_dir: str = os.path.join(BALLU_ASSETS_DIR, "robots", "morphologies", NEXT_LAB_DATE)
     ):
         """
         Initialize robot generator.
