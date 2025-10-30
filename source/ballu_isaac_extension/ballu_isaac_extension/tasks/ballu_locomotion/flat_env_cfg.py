@@ -218,11 +218,16 @@ class RewardsCfg:
                 "std": 0.1
             }
     )
+    # Reward to encourage high jump with upward velocity
+    high_jump_via_upwd_vel = RewTerm(
+        func=mdp.upward_velocity_z,
+        weight=1.0,
+    )
 
     # Reward to encourage high jump
     high_jump = RewTerm(
         func=mdp.feet_z_pos_flat_exp,
-        weight=1.0,
+        weight=0.0,
         params={
             "slope": 1.73
         }

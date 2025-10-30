@@ -38,7 +38,7 @@ def feet_z_pos_1_obstacle_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: S
     tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
     tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
     tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
-    feet_offset_b = torch.tensor([0.0, 0.21 + 0.06 + 0.004, 0.0], 
+    feet_offset_b = torch.tensor([0.0, 0.32 + 0.06 + 0.004, 0.0], 
                                 device=env.device, dtype=tibia_pos_w.dtype)
     feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
     pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
@@ -89,6 +89,14 @@ def feet_z_pos_flat_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEn
     rew = torch.nan_to_num(rew, nan=0.0)
     # assert rew has no nan
     assert not torch.isnan(rew).any()
+    return rew
+
+def upward_velocity_z(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward upward velocity along the z-axis"""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    Vz = torch.nan_to_num(asset.data.root_lin_vel_b[:, 2], nan=0.0)
+    condition = torch.logical_or(Vz > 0.8, Vz <= 0.0)
+    rew = torch.where(condition, torch.zeros_like(Vz), Vz)
     return rew
 
 def position_tracking_l2_singleObj(

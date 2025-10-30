@@ -190,6 +190,12 @@ class RewardsCfg:
         }
     )
 
+    # Reward to encourage high jump with upward velocity
+    high_jump_via_upwd_vel = RewTerm(
+        func=mdp.upward_velocity_z,
+        weight=0.0,
+    )
+    
     # Shaping reward - jump to clear the obstacle
     high_jump = RewTerm(
         func=mdp.feet_z_pos_1_obstacle_exp,
