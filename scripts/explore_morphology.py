@@ -14,6 +14,8 @@ import torch
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_dir = os.path.dirname(script_dir)
 ext_dir = os.path.join(project_dir, "source", "ballu_isaac_extension", "ballu_isaac_extension")
+next_lab_date = "11.04.2025"
+
 if ext_dir not in sys.path:
     sys.path.insert(0, ext_dir)
 
@@ -50,7 +52,7 @@ def run_training_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/10.24.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/{next_lab_date}/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -111,7 +113,7 @@ def run_testing_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/10.24.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/{next_lab_date}/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -354,7 +356,7 @@ def main():
         print("No trials completed successfully.")
     
     # Save summary
-    summary_path = f"{project_dir}/logs/optuna/10.14.2025/{STUDY_NAME}_summary.json"
+    summary_path = f"{project_dir}/logs/optuna/{next_lab_date}/{STUDY_NAME}_summary.json"
     os.makedirs(os.path.dirname(summary_path), exist_ok=True)
     
     summary = {
