@@ -21,7 +21,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+parser.add_argument("--gravity_compensation_ratio", type=float, default=0.65, 
                    help="Gravity compensation ratio")
 parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 

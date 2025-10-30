@@ -31,7 +31,7 @@ parser.add_argument("--common_folder", type=str, default=None,
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
 parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+parser.add_argument("--gravity_compensation_ratio", type=float, default=0.65, 
                    help="Gravity compensation ratio")
 parser.add_argument("--fl_ratio", type=float, default=0.5, 
                    help="Ratio of femur length to total leg length")
