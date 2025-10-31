@@ -35,10 +35,10 @@ def forward_velocity_x(
 def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Reward feet z position."""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
-    tibia_ids, _ = asset.find_bodies("TIBIA_(LEFT|RIGHT)") # (2,)
+    tibia_ids, _ = asset.find_bodies("ELECTRONICS_(LEFT|RIGHT)") # (2,)
     tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
     tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
-    feet_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], 
+    feet_offset_b = torch.tensor([0.0, 0.03 + 0.004, 0.0], 
                                 device=env.device, dtype=tibia_pos_w.dtype)
     feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
     pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)

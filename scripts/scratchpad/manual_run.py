@@ -18,6 +18,7 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 import json
+import pandas as pd
 
 from isaaclab.app import AppLauncher
 
@@ -142,21 +143,22 @@ def main():
     right_tibia_idx = right_tibia_ids[0]
     tibia_endpoints_world_history = []  # list of tensors shape (num_envs, 2, 3) per step [left,right]
     tibia_startpoints_world_history = []  # list of tensors shape (num_envs, 2, 3) per step [left,right]
+    obs_history = []
     count = 0
     cum_rewards = 0
     while simulation_app.is_running():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            #actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
-            actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
+            # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
             # if count % env.max_episode_length <= 150:
-            #     actions = both_legs_theta(theta=0.1, num_envs=args_cli.num_envs)
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
             # else:
-            #     actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            #     actions = both_legs_1(num_envs=args_cli.num_envs)
             # ---- Best action sequence for jumping ----
             # if count % 140 <= 80:
             #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
@@ -178,6 +180,7 @@ def main():
             obs, rew, terminated, truncated, info = env.step(actions)
             base_velocity = robots.data.root_lin_vel_b.clone().detach().cpu()
             base_speed_history.append(base_velocity)
+            obs_history.append(obs["policy"])
             # Compute tibia endpoints (world frame) for left/right tibias across all envs
             # Link poses in world frame
             link_pos_w = robots.data.body_link_pos_w  # (num_envs, num_bodies, 3)
@@ -212,6 +215,7 @@ def main():
             torque_history.append(torques_applied_on_knees.detach().cpu())
             cum_rewards += rew
             count += 1
+            # print("count: ", count)
             # if count == env.max_episode_length:
             #    break
             # if terminated.any() or truncated.any():
@@ -261,6 +265,8 @@ def main():
                     print(f"[ERROR] Failed to extract robot geometry: {e}")
                     import traceback
                     traceback.print_exc()
+                
+                print("obs['policy'].shape: ", obs["policy"].shape)
             #     print("Obstacle height list: ", env.unwrapped.obstacle_height_list)
             # if count % env.max_episode_length == 0:
             #     env.unwrapped.scene._default_env_origins = torch.rand(env.unwrapped.num_envs, 3, device=env.device) * 6.0
@@ -270,7 +276,7 @@ def main():
     env.close()
     print(f"Cumulative rewards: {cum_rewards.item()}")
     base_speed_history = torch.stack(base_speed_history)
-    
+    obs_history = torch.stack(obs_history)
     base_vel_mean = base_speed_history.mean(dim=0)
     base_vel_std = base_speed_history.std(dim=0)
     print("base_vel_mean: ", base_vel_mean)
@@ -278,42 +284,93 @@ def main():
 
     print("Shape of base_speed_history: ", base_speed_history.shape)
 
-    results_dir = "logs/results/manual_run"
-    # Plot base speed components
-    plt.figure(figsize=(10, 6))
-    timesteps = base_speed_history.shape[0]
-    components = ['X', 'Y', 'Z']
-    colors = ['b', 'g', 'r']
+    obs_hist_np = obs_history.detach().cpu().numpy().squeeze(axis=1)
+    print("Shape of obs_hist_np: ", obs_hist_np.shape)
+    obs_hist_df = pd.DataFrame(obs_hist_np, columns=[
+        "joint_pos_hip_left",
+        "joint_pos_hip_right",
+        "joint_pos_neck",
+        "joint_pos_knee_left",
+        "joint_pos_knee_right",
+        "joint_pos_motor_left",
+        "joint_pos_motor_right",
+        "joint_vel_hip_left",
+        "joint_vel_hip_right",
+        "joint_vel_neck",
+        "joint_vel_knee_left",
+        "joint_vel_knee_right",
+        "joint_vel_motor_left",
+        "joint_vel_motor_right",
+        "left_elctx_quat_1",
+        "left_elctx_quat_2",
+        "left_elctx_quat_3",
+        "left_elctx_quat_4",
+        "left_elctx_ang_vel_x",
+        "left_elctx_ang_vel_y",
+        "left_elctx_ang_vel_z",
+        "left_elctx_lin_acc_x",
+        "left_elctx_lin_acc_y",
+        "left_elctx_lin_acc_z",
+        "right_elctx_quat_1",
+        "right_elctx_quat_2",
+        "right_elctx_quat_3",
+        "right_elctx_quat_4",
+        "right_elctx_ang_vel_x",
+        "right_elctx_ang_vel_y",
+        "right_elctx_ang_vel_z",
+        "right_elctx_lin_acc_x",
+        "right_elctx_lin_acc_y",
+        "right_elctx_lin_acc_z",
+        "gt_left_elctx_quat_1",
+        "gt_left_elctx_quat_2",
+        "gt_left_elctx_quat_3",
+        "gt_left_elctx_quat_4",
+        "gt_left_elctx_ang_vel_x",
+        "gt_left_elctx_ang_vel_y",
+        "gt_left_elctx_ang_vel_z",
+        "gt_left_elctx_lin_acc_x",
+        "gt_left_elctx_lin_acc_y",
+        "gt_left_elctx_lin_acc_z",
+    ])
+    obs_hist_df.to_csv(os.path.join("logs/results/manual_run", 'obs_history.csv'), index=False)
+    print("Saved observation history to obs_history.csv")
+
+    # results_dir = "logs/results/manual_run"
+    # # Plot base speed components
+    # plt.figure(figsize=(10, 6))
+    # timesteps = base_speed_history.shape[0]
+    # components = ['X', 'Y', 'Z']
+    # colors = ['b', 'g', 'r']
     
-    for i in range(3):
-        plt.subplot(3, 1, i+1)
-        plt.plot(range(timesteps), base_speed_history[:, 0, i], color=colors[i])
-        plt.ylabel(f'{components[i]} Speed (m/s)')
-        plt.grid(True)
+    # for i in range(3):
+    #     plt.subplot(3, 1, i+1)
+    #     plt.plot(range(timesteps), base_speed_history[:, 0, i], color=colors[i])
+    #     plt.ylabel(f'{components[i]} Speed (m/s)')
+    #     plt.grid(True)
     
-    plt.xlabel('Timesteps')
-    plt.suptitle('Base Speed Components Over Time')
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, 'base_speed_components_jump.png'))
-    plt.close()
+    # plt.xlabel('Timesteps')
+    # plt.suptitle('Base Speed Components Over Time')
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(results_dir, 'base_speed_components_jump.png'))
+    # plt.close()
     
-    torque_history = torch.stack(torque_history)
-    plt.figure(figsize=(10, 6))
-    timesteps = torque_history.shape[0]
-    components = ['Left Knee', 'Right Knee']
-    colors = ['b', 'g']
+    # torque_history = torch.stack(torque_history)
+    # plt.figure(figsize=(10, 6))
+    # timesteps = torque_history.shape[0]
+    # components = ['Left Knee', 'Right Knee']
+    # colors = ['b', 'g']
     
-    for i in range(2):
-        plt.subplot(2, 1, i+1)
-        plt.plot(range(timesteps), torque_history[:, 0, i], color=colors[i], alpha=0.67)
-        plt.ylabel(f'{components[i]} Torque (Nm)')
-        plt.grid(True)
+    # for i in range(2):
+    #     plt.subplot(2, 1, i+1)
+    #     plt.plot(range(timesteps), torque_history[:, 0, i], color=colors[i], alpha=0.67)
+    #     plt.ylabel(f'{components[i]} Torque (Nm)')
+    #     plt.grid(True)
     
-    plt.xlabel('Timesteps')
-    plt.suptitle('Torque Applied on Knees Over Time')
-    plt.tight_layout()
-    plt.savefig(os.path.join(results_dir, 'knee_torque_jump.png'))
-    plt.close()
+    # plt.xlabel('Timesteps')
+    # plt.suptitle('Torque Applied on Knees Over Time')
+    # plt.tight_layout()
+    # plt.savefig(os.path.join(results_dir, 'knee_torque_jump.png'))
+    # plt.close()
 
     # Summarize tibia endpoint tracking
     if len(tibia_endpoints_world_history) > 0:

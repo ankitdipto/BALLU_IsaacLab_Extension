@@ -7,6 +7,7 @@ from isaaclab.assets.articulation.articulation import Articulation
 from isaaclab.sensors.contact_sensor.contact_sensor import ContactSensor
 from isaaclab.managers import SceneEntityCfg
 from .geometry_utils import *
+import isaaclab.utils.math as math_utils
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
@@ -102,3 +103,25 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         MORPH_VECTOR = morphology_vector
     # print(f"Morphology vector shape: {MORPH_VECTOR.shape}")
     return MORPH_VECTOR
+
+def imu_information_combined(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """IMU information combined"""
+    # extract the used quantities (to enable type-hinting)
+    asset: Articulation = env.scene[asset_cfg.name]
+    feet_ids, _ = asset.find_bodies("ELECTRONICS_(LEFT|RIGHT)")  # (2,)
+    imu_orient_w = asset.data.body_link_quat_w[:, feet_ids, :]  # (num_envs, 2, 4)
+    imu_ang_vel_w = asset.data.body_link_ang_vel_w[:, feet_ids, :]  # (num_envs, 2, 3)
+    imu_lin_acc_w = asset.data.body_lin_acc_w[:, feet_ids, :]  # (num_envs, 2, 3)
+    # Convert world-frame signals to the respective body (IMU) frame
+    imu_ang_vel_b = math_utils.quat_rotate_inverse(imu_orient_w, imu_ang_vel_w)
+    imu_lin_acc_b = math_utils.quat_rotate_inverse(imu_orient_w, imu_lin_acc_w)
+    assert imu_orient_w.shape == (env.num_envs, 2, 4), f"IMU orientation shape mismatch, expected (num_envs, 2, 4), got {imu_orient_w.shape}"
+    assert imu_ang_vel_b.shape == (env.num_envs, 2, 3), f"IMU angular velocity shape mismatch, expected (num_envs, 2, 3), got {imu_ang_vel_b.shape}"
+    assert imu_lin_acc_b.shape == (env.num_envs, 2, 3), f"IMU linear acceleration shape mismatch, expected (num_envs, 2, 3), got {imu_lin_acc_b.shape}"
+    
+    imu_information_combined = torch.cat([imu_orient_w, imu_ang_vel_b, imu_lin_acc_b], dim=-1)
+    # I need to flatten this tensor from (N, 2, 10) to (N, 20)
+    imu_information_combined_flattened = imu_information_combined.view(env.num_envs, -1)
+    assert imu_information_combined_flattened.shape == (env.num_envs, 20), f"IMU information combined shape mismatch, expected (num_envs, 20), got {imu_information_combined_flattened.shape}"
+    # assert imu_lin_acc_b.allclose(imu_lin_acc_w), f"IMU linear acceleration mismatch, expected {imu_lin_acc_w}, got {imu_lin_acc_b}"
+    return imu_information_combined_flattened

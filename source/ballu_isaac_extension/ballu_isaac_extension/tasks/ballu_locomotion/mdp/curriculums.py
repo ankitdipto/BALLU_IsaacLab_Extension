@@ -96,7 +96,7 @@ def obstacle_height_levels_same_row(
     obstacle_center_x: float = 1.0,
     obstacle_half_size_x: float = 0.5,
     inter_obstacle_spacing_y: float = 2.0,
-    warmup_period: int = 80, # 80 iterations
+    warmup_period: int = 100, # 100 iterations
     asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
 ) -> float:
 

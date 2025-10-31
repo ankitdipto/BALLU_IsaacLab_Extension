@@ -65,20 +65,28 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     #                                  history_length=3, 
     #                                  track_air_time=True)
     
-    # IMU sensors on tibias
-    # imu_tibia_left = ImuCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
-    #     update_period=0.05,  # Corresponds to 20Hz
-    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
-    #     debug_vis=True,
-    # )
+    # IMU sensors at the feet
+    imu_electronics_left = ImuCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
+        update_period=0.05,  # Corresponds to 20Hz
+        gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+        debug_vis=True,
+        offset=ImuCfg.OffsetCfg(
+            pos=(0.0, 0.0, 0.0),
+            rot=(1.0, 0.0, 0.0, 0.0)
+        ),
+    )
     
-    # imu_tibia_right = ImuCfg(
-    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
-    #     update_period=0.05,  # Corresponds to 20Hz
-    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
-    #     debug_vis=True,
-    # )
+    imu_electronics_right = ImuCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
+        update_period=0.05,  # Corresponds to 20Hz
+        gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+        debug_vis=True,
+        offset=ImuCfg.OffsetCfg(
+            pos=(0.0, 0.0, 0.0),
+            rot=(1.0, 0.0, 0.0, 0.0)
+        ),
+    )
 
     # IMU sensors on femurs
     # imu_femur_left = ImuCfg(
@@ -145,6 +153,18 @@ class ObservationsCfg:
         #base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
         #actions = ObsTerm(func=mdp.last_action)
+
+        # IMU sensor readings at the feet
+        left_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+        left_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+        left_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+
+        right_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+        right_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+        right_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+
+        # Ground truth IMU sensor readings
+        imu_information_combined_flattened = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
 
         # IMU sensor readings on tibias
         #left_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})

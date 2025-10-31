@@ -16,8 +16,10 @@ from isaaclab.managers import CurriculumTermCfg as CurrTerm
 from isaaclab.managers import ObservationTermCfg as ObsTerm
 from isaaclab.managers import RewardTermCfg as RewTerm
 from isaaclab.managers import TerminationTermCfg as DoneTerm
+from isaaclab.managers import SceneEntityCfg
 from isaaclab.scene import InteractiveSceneCfg
 from isaaclab.sensors import ContactSensorCfg
+# from isaaclab.sensors.imu import ImuCfg
 import isaaclab.sim as sim_utils
 from isaaclab.utils import configclass
 from isaaclab.utils.assets import ISAAC_NUCLEUS_DIR
@@ -88,11 +90,33 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     # )
 
     # contact sensors at feet
-    contact_forces_tibia = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
-        update_period=0.05, # 20 Hz
-        debug_vis=True
-    )
+    # contact_forces_tibia = ContactSensorCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
+    #     update_period=0.05, # 20 Hz
+    #     debug_vis=True
+    # )
+
+    # IMU sensors on tibias
+    # imu_tibia_left = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    #     offset=ImuCfg.OffsetCfg(
+    #         pos=(0.0, 0.73, 0.0), 
+    #         rot=(1.0, 0.0, 0.0, 0.0)
+    #     ),
+    # )
+    # imu_tibia_right = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 9.81),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    #     offset=ImuCfg.OffsetCfg(
+    #         pos=(0.0, 0.73, 0.0), 
+    #         rot=(1.0, 0.0, 0.0, 0.0)
+    #     ),
+    # )
 
     # Generated obstacles are added as individual AssetBaseCfg entries in __post_init__
     obstacles = None
@@ -153,7 +177,22 @@ class ObservationsCfg:
         limb_dist_from_obstacle = ObsTerm(func=mdp.distance_of_limbs_from_obstacle_priv)
 
         # Where is the goal wrt environment origin i.e. environment frame?
-        # goal_pos_w = ObsTerm(func=mdp.goal_location_w_priv) TODO: Uncomment this after reproducibility tasks are over.
+        goal_pos_w = ObsTerm(func=mdp.goal_location_w_priv)
+
+        # what is the base velocity of the robot?
+        base_velocity = ObsTerm(func=mdp.base_lin_vel)
+
+        # IMU sensor readings on tibias
+        # left_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+        # left_tibia_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+        # left_tibia_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
+        
+        # right_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+        # right_tibia_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+        # right_tibia_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_tibia_right")})
+
+        # IMU readings collected from the simulator's privileged underlying physics engine
+        imu_info_from_api = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
 
         # What action did the robot take last?
         last_action = ObsTerm(func=mdp.last_action)
