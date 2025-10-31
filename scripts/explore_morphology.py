@@ -30,23 +30,22 @@ def run_training_experiment(
         task: str = "Isc-Vel-BALLU-1-obstacle",
         max_iterations: int = 50,
         seed: int = 42,
-        knee_damping: float = 0.08,
-        spring_damping: float = 0.01,
-        gravity_comp_ratio: float = 0.84
+        spring_coeff: float = 0.00807,
+        gravity_comp_ratio: float = 0.65
     ) -> tuple[bool, float]:
     """Run training experiment and return success status and best curriculum level."""
     train_script_path = f"{project_dir}/scripts/rsl_rl/train.py"
     cmd = [
-        sys.executable, train_script_path,
+        sys.executable, 
+        train_script_path,
         "--task", task,
         "--num_envs", "4096",
         "--max_iterations", str(max_iterations),
-        "--run_name", f"{morph_id}_seed{seed}",
+        "--run_name", morph_id,
         "--headless",
         "--seed", str(seed),
         "--gravity_compensation_ratio", str(gravity_comp_ratio),
-        f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
-        f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}"
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coeff:.6f}"
     ]
 
     env = os.environ.copy()
@@ -87,9 +86,8 @@ def run_testing_experiment(
         video_length: int = 399,
         device: str = "cuda:0",
         difficulty_level: int = 0,
-        knee_damping: float = 0.08,
-        spring_damping: float = 0.01,
-        gravity_comp_ratio: float = 0.84
+        spring_coeff: float = 0.00807,
+        gravity_comp_ratio: float = 0.65
     ) -> tuple[bool, str]:
     """Run testing experiment for a trained morphology and return success status."""
     test_script_path = f"{project_dir}/scripts/rsl_rl/play_single_obstacle.py"
@@ -106,8 +104,7 @@ def run_testing_experiment(
         "--headless",
         "--difficulty_level", str(difficulty_level),
         "--gravity_compensation_ratio", str(gravity_comp_ratio),
-        f"env.scene.robot.actuators.knee_effort_actuators.pd_d={knee_damping}",
-        f"env.scene.robot.actuators.knee_effort_actuators.spring_damping={spring_damping}",
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coeff:.6f}",
     ]
 
     env = os.environ.copy()
@@ -184,12 +181,12 @@ def objective(
     femur_length = trial.suggest_float("femur_length", 0.20, 0.45)
     tibia_length = trial.suggest_float("tibia_length", 0.20, 0.40)
     # femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
-    knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
-    spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
-    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.80, 0.87)
-    
+    # knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
+    # spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.60, 0.90)
+    spring_coeff = trial.suggest_float("spring_coeff", 1e-3, 1e-1)
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
-    morph_id = f"trial{trial.number:02d}_f{femur_length:.3f}_t{tibia_length:.3f}_knKd{knee_damping:.3f}_spD{spring_damping:.3f}_GCR{gravity_comp_ratio:.3f}"
+    morph_id = f"trial{trial.number:02d}_f{femur_length:.3f}_t{tibia_length:.3f}_spc{spring_coeff:.3f}_gcr{gravity_comp_ratio:.3f}"
 
     sampled_config = {
         "morphology_id": morph_id,
@@ -212,8 +209,7 @@ def objective(
         task=task,
         max_iterations=max_iterations, 
         seed=seed,
-        knee_damping=knee_damping,
-        spring_damping=spring_damping,
+        spring_coeff=spring_coeff,
         gravity_comp_ratio=gravity_comp_ratio
     )
     
@@ -243,8 +239,7 @@ def objective(
         video_length=test_video_length,
         device=device,
         difficulty_level=difficulty,
-        knee_damping=knee_damping,
-        spring_damping=spring_damping,
+        spring_coeff=spring_coeff,
         gravity_comp_ratio=gravity_comp_ratio
     )
     print(f"[Trial {trial.number}] Testing {'SUCCESS' if test_success else 'FAILED'}")
