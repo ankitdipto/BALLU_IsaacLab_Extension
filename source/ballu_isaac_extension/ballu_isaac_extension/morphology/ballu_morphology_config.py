@@ -44,12 +44,12 @@ class LinkDensities:
     preserve the physical properties of the baseline robot. The balloon's density
     is an "effective" density representing its net buoyancy.
     """
-    PELVIS: Final[float] = 1805.5
-    FEMUR: Final[float] = 329.3
-    TIBIA: Final[float] = 329.3  # Updated to match femur density; previous was 400 
-    ELECTRONICS: Final[float] = 5900.0  # Maintains original leg mass
+    PELVIS: Final[float] = 329.3 * (5.0 / 8.28)# 1805.5
+    FEMUR: Final[float] = 329.3 * (5.0 / 8.28)
+    TIBIA: Final[float] = 329.3 * (5.0 / 8.28)  # Updated to match femur density; previous was 400 
+    ELECTRONICS: Final[float] = 5900.0 * (9.0 / 7.0)  # New density reported by Yusuke
     MOTORARM: Final[float] = 1666.7
-    BALLOON_EFFECTIVE: Final[float] = 0.706
+    BALLOON_EFFECTIVE: Final[float] = 0.706 / 3.0
 
 # Global constant for easy access
 DENSITIES: Final = LinkDensities()

@@ -49,7 +49,7 @@ def run_training_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/10.24.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/11.04.2025/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -108,7 +108,7 @@ def run_testing_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/10.24.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/11.04.2025/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -180,18 +180,20 @@ def objective(
     # Sample parameters
     femur_length = trial.suggest_float("femur_length", 0.20, 0.45)
     tibia_length = trial.suggest_float("tibia_length", 0.20, 0.40)
+    hip_width = trial.suggest_float("hip_width", 0.08, 0.14)
     # femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     # knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
     # spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
-    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.60, 0.90)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.60, 0.86)
     spring_coeff = trial.suggest_float("spring_coeff", 1e-3, 1e-1)
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
-    morph_id = f"trial{trial.number:02d}_f{femur_length:.3f}_t{tibia_length:.3f}_spc{spring_coeff:.3f}_gcr{gravity_comp_ratio:.3f}"
+    morph_id = f"trial{trial.number:02d}_fl{femur_length:.3f}_tl{tibia_length:.3f}_hw{hip_width:.3f}_spc{spring_coeff:.3f}_gcr{gravity_comp_ratio:.3f}"
 
     sampled_config = {
         "morphology_id": morph_id,
         "femur_length": femur_length,
-        "tibia_length": tibia_length
+        "tibia_length": tibia_length,
+        "hip_width": hip_width,
         # "femur_to_limb_ratio": femur_to_limb_ratio
     }
     
