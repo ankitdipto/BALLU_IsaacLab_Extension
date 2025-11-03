@@ -48,7 +48,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.1), 
+        pos=(0.0, 0.0, 0.9), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
@@ -72,11 +72,11 @@ BALLU_REAL_CFG = ArticulationCfg(
             joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
             effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
             velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
-            spring_coeff=0.00807, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_coeff=0.00507, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
             spring_damping=1.0e-3,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
-            pd_p=0.50, #1.00, #0.9, #1.0,
-            pd_d=0.04, #0.08, #0.02
+            pd_p=0.20, #1.00, #0.9, #1.0,
+            pd_d=0.02, #0.08, #0.02
             stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
             damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
         ),
