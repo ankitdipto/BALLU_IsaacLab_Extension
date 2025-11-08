@@ -113,7 +113,6 @@ def main():
     print("buoyancy_offset: ", args_cli.buoyancy_offset)
     # setup RL environment
     env = ManagerBasedRLEnv(cfg=env_cfg, gravity_compensation_ratio=args_cli.gravity_compensation_ratio) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
-    
     # print environment information
     print(f"\n=== ENVIRONMENT INFO ===")
     print(f"Observation space: {env.unwrapped.observation_space}")
@@ -127,6 +126,18 @@ def main():
     print(f"Robot body names: {robots.body_names}")
     print(f"Robot joint names: {robots.joint_names}")
 
+    pelvis_idx, _ = robots.find_bodies("PELVIS")
+    print("Pelvis index: ", pelvis_idx)
+
+    masses = robots.root_physx_view.get_masses()
+    print(f"Pelvis mass: {masses[0, pelvis_idx].item() * 1000:.6f} g")
+
+    # masses[:, pelvis_idx] *= 10
+    # robots.root_physx_view.set_masses(
+    #     masses, 
+    #     torch.arange(env.num_envs, device="cpu")
+    # )
+    # print(f"Pelvis mass after override: {masses[0, pelvis_idx].item() * 1000:.6f} g")
     # print("Viewer object: ", env.viewport_camera_controller.__dict__)
     
     # simulate physics
@@ -150,22 +161,22 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            #actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
             # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
             # if count % env.max_episode_length <= 150:
-            #     actions = both_legs_0(num_envs=args_cli.num_envs)
-            # else:
             #     actions = both_legs_1(num_envs=args_cli.num_envs)
-            # ---- Best action sequence for jumping ----
-            # if count % 140 <= 80:
-            #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
-            # elif count % 140 <= 85:
-            #     actions = both_legs_0(num_envs=args_cli.num_envs)
             # else:
-            #     actions = both_legs_1(num_envs = args_cli.num_envs)
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
+            # ---- Best action sequence for jumping ----
+            if count % env.max_episode_length <= 80:
+                actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
+            elif count % env.max_episode_length <= 85:
+                actions = both_legs_0(num_envs=args_cli.num_envs)
+            else:
+                actions = both_legs_1(num_envs = args_cli.num_envs)
 
             # if count % 200 <= 90:
             #     actions = both_legs_theta(theta=0.8, num_envs=args_cli.num_envs)
@@ -178,6 +189,8 @@ def main():
             #actions = torch.zeros_like(env.action_manager.action)
             #actions = bang_bang_control(count, period=40, num_envs=args_cli.num_envs)
             obs, rew, terminated, truncated, info = env.step(actions)
+
+            # print("episode length buffer: ", env.episode_length_buf)
             base_velocity = robots.data.root_lin_vel_b.clone().detach().cpu()
             base_speed_history.append(base_velocity)
             obs_history.append(obs["policy"])
@@ -232,13 +245,14 @@ def main():
                     print(f"Femur left cylinder - radius: {dims.femur_left.radius.item():.6f}, height: {dims.femur_left.height.item():.6f}")
                     print(f"Femur right cylinder - radius: {dims.femur_right.radius.item():.6f}, height: {dims.femur_right.height.item():.6f}")
                     
-                    print(f"Tibia left cylinder - radius: {dims.tibia_left.cylinder.radius.item():.6f}, height: {dims.tibia_left.cylinder.height.item():.6f}")
-                    print(f"Tibia left box - size: {dims.tibia_left.box.size.squeeze()}")
-                    print(f"Tibia left sphere - radius: {dims.tibia_left.sphere.radius.item():.6f}")
+                    print(f"Tibia left cylinder - radius: {dims.tibia_left.radius.item():.6f}, height: {dims.tibia_left.height.item():.6f}")
+                    print(f"Tibia right cylinder - radius: {dims.tibia_right.radius.item():.6f}, height: {dims.tibia_right.height.item():.6f}")
                     
-                    print(f"Tibia right cylinder - radius: {dims.tibia_right.cylinder.radius.item():.6f}, height: {dims.tibia_right.cylinder.height.item():.6f}")
-                    print(f"Tibia right box - size: {dims.tibia_right.box.size.squeeze()}")
-                    print(f"Tibia right sphere - radius: {dims.tibia_right.sphere.radius.item():.6f}")
+                    print(f"Electronics left box - size: {dims.electronics_left.box.size.squeeze()}")
+                    print(f"Electronics left sphere - radius: {dims.electronics_left.sphere.radius.item():.6f}")
+                    
+                    print(f"Electronics right box - size: {dims.electronics_right.box.size.squeeze()}")
+                    print(f"Electronics right sphere - radius: {dims.electronics_right.sphere.radius.item():.6f}")
                     
                     # Demonstrate batch extraction for multiple environments (if available)
                     if args_cli.num_envs > 1:
@@ -249,14 +263,20 @@ def main():
                     
                     # Demonstrate concatenation for RL observations
                     print("\n=== RL OBSERVATION FEATURES ===")
+                    print(f"electronics left box size: {dims.electronics_left.box.size}")
+                    print(f"electronics right box size: {dims.electronics_right.box.size}")
+                    print(f"electronics left sphere radius: {dims.electronics_left.sphere.radius}")
+                    print(f"electronics right sphere radius: {dims.electronics_right.sphere.radius}")
                     obs_features = torch.cat([
                         dims.pelvis.radius,
                         dims.femur_left.radius,
                         dims.femur_right.radius,
-                        dims.tibia_left.cylinder.height,
-                        dims.tibia_right.cylinder.height,
-                        dims.tibia_left.sphere.radius,
-                        dims.tibia_right.sphere.radius
+                        dims.tibia_left.height,
+                        dims.tibia_right.height,
+                        dims.electronics_left.box.size[:, 1],
+                        dims.electronics_right.box.size[:, 1],
+                        dims.electronics_left.sphere.radius,
+                        dims.electronics_right.sphere.radius,
                     ], dim=-1)
                     print(f"Concatenated geometry features: {obs_features}")
                     print(f"Feature shape: {obs_features.shape}")

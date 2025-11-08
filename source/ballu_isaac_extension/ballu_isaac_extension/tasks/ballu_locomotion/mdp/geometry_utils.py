@@ -37,13 +37,11 @@ class SphereGeometry:
     """Sphere geometry with tensorized properties."""
     radius: torch.Tensor  # Shape: [num_envs] or [1]
 
-
 @dataclass
-class TibiaGeometry:
-    """Complete tibia geometry with all collision parts."""
-    cylinder: CylinderGeometry  # Main tibia cylinder (mesh_0)
-    box: BoxGeometry           # Electronics box (mesh_1) 
-    sphere: SphereGeometry     # Foot sphere (mesh_2)
+class ElectronicsGeometry:
+    """Electronics geometry with tensorized properties."""
+    cylinder: CylinderGeometry  # Electronics box (mesh_0)
+    sphere: SphereGeometry  # Foot sphere (mesh_1)
 
 
 @dataclass
@@ -52,8 +50,10 @@ class RobotDimensions:
     pelvis: CylinderGeometry
     femur_left: CylinderGeometry
     femur_right: CylinderGeometry
-    tibia_left: TibiaGeometry
-    tibia_right: TibiaGeometry
+    tibia_left: CylinderGeometry
+    tibia_right: CylinderGeometry
+    electronics_left: ElectronicsGeometry
+    electronics_right: ElectronicsGeometry
 
 
 class RobotGeometryExtractor:
@@ -212,7 +212,7 @@ class RobotGeometryExtractor:
             height=torch.tensor(heights, dtype=torch.float32)
         )
     
-    def extract_tibia_dimensions(self, env_indices: Union[int, List[int], slice], side: str) -> TibiaGeometry:
+    def extract_tibia_dimensions(self, env_indices: Union[int, List[int], slice], side: str) -> CylinderGeometry:
         """Extract all tibia collision geometries for specified side."""
         if side not in ['LEFT', 'RIGHT']:
             raise ValueError(f"Side must be 'LEFT' or 'RIGHT', got: {side}")
@@ -229,12 +229,6 @@ class RobotGeometryExtractor:
         cyl_radii = []
         cyl_heights = []
         
-        # Box (mesh_1) 
-        box_sizes = []
-        
-        # Sphere (mesh_2)
-        sphere_radii = []
-        
         for env_idx in env_indices:
             base_path = f"{self._get_env_path(env_idx)}/TIBIA_{side}/collisions"
             
@@ -243,28 +237,54 @@ class RobotGeometryExtractor:
             radius, height = self._extract_cylinder_geometry(cyl_path)
             cyl_radii.append(radius)
             cyl_heights.append(height)
-            
-            # Extract box/cube
-            box_path = f"{base_path}/mesh_1/box"
-            width, height_box, depth = self._extract_box_geometry(box_path)
-            box_sizes.append([width, height_box, depth])
-            
-            # Extract sphere
-            sphere_path = f"{base_path}/mesh_2/sphere"
-            sphere_radius = self._extract_sphere_geometry(sphere_path)
-            sphere_radii.append(sphere_radius)
         
-        return TibiaGeometry(
-            cylinder=CylinderGeometry(
+        return CylinderGeometry(
                 radius=torch.tensor(cyl_radii, dtype=torch.float32),
                 height=torch.tensor(cyl_heights, dtype=torch.float32)
+        )
+
+    def extract_electronics_dimensions(self, env_indices: Union[int, List[int], slice], side: str) -> ElectronicsGeometry:
+        """Extract electronics collision geometries (box, sphere) for specified side.
+
+        The electronics link has two collision meshes:
+        - mesh_0: box
+        - mesh_1: sphere
+        """
+        if side not in ['LEFT', 'RIGHT']:
+            raise ValueError(f"Side must be 'LEFT' or 'RIGHT', got: {side}")
+
+        if isinstance(env_indices, int):
+            env_indices = [env_indices]
+        elif isinstance(env_indices, slice):
+            start = env_indices.start or 0
+            stop = env_indices.stop or 100
+            step = env_indices.step or 1
+            env_indices = list(range(start, stop, step))
+
+        cyl_radii: List[float] = []
+        cyl_heights: List[float] = []
+        sphere_radii: List[float] = []
+
+        for env_idx in env_indices:
+            base_path = f"{self._get_env_path(env_idx)}/ELECTRONICS_{side}/collisions"
+
+            # mesh_0: cylinder
+            cylinder_path = f"{base_path}/mesh_0/cylinder"
+            radius, height = self._extract_cylinder_geometry(cylinder_path)
+            cyl_radii.append(radius)
+            cyl_heights.append(height)
+
+            # mesh_1: sphere
+            sphere_path = f"{base_path}/mesh_1/sphere"
+            sphere_radius = self._extract_sphere_geometry(sphere_path)
+            sphere_radii.append(sphere_radius)
+
+        return ElectronicsGeometry(
+            cylinder=CylinderGeometry(
+                radius=torch.tensor(cyl_radii, dtype=torch.float32), 
+                height=torch.tensor(cyl_heights, dtype=torch.float32)
             ),
-            box=BoxGeometry(
-                size=torch.tensor(box_sizes, dtype=torch.float32)
-            ),
-            sphere=SphereGeometry(
-                radius=torch.tensor(sphere_radii, dtype=torch.float32)
-            )
+            sphere=SphereGeometry(radius=torch.tensor(sphere_radii, dtype=torch.float32)),
         )
     
     def extract_robot_dimensions(self, env_indices: Union[int, List[int], slice]) -> RobotDimensions:
@@ -274,7 +294,9 @@ class RobotGeometryExtractor:
             femur_left=self.extract_femur_dimensions(env_indices, 'LEFT'),
             femur_right=self.extract_femur_dimensions(env_indices, 'RIGHT'),
             tibia_left=self.extract_tibia_dimensions(env_indices, 'LEFT'),
-            tibia_right=self.extract_tibia_dimensions(env_indices, 'RIGHT')
+            tibia_right=self.extract_tibia_dimensions(env_indices, 'RIGHT'),
+            electronics_left=self.extract_electronics_dimensions(env_indices, 'LEFT'),
+            electronics_right=self.extract_electronics_dimensions(env_indices, 'RIGHT'),
         )
 
 
@@ -338,7 +360,7 @@ def get_femur_dimensions(env_indices: Union[int, List[int], slice], side: str) -
     return _get_extractor().extract_femur_dimensions(env_indices, side)
 
 
-def get_tibia_dimensions(env_indices: Union[int, List[int], slice], side: str) -> TibiaGeometry:
+def get_tibia_dimensions(env_indices: Union[int, List[int], slice], side: str) -> CylinderGeometry:
     """
     Extract all tibia collision geometries for specified side.
     
@@ -347,6 +369,20 @@ def get_tibia_dimensions(env_indices: Union[int, List[int], slice], side: str) -
         side: 'LEFT' or 'RIGHT'
         
     Returns:
-        TibiaGeometry with all collision parts (cylinder, box, sphere)
+        CylinderGeometry with cylinder dimensions
     """
     return _get_extractor().extract_tibia_dimensions(env_indices, side)
+
+
+def get_electronics_dimensions(env_indices: Union[int, List[int], slice], side: str) -> ElectronicsGeometry:
+    """
+    Extract electronics collision geometries for specified side.
+
+    Args:
+        env_indices: Environment index, list of indices, or slice
+        side: 'LEFT' or 'RIGHT'
+
+    Returns:
+        ElectronicsGeometry with box and sphere collisions
+    """
+    return _get_extractor().extract_electronics_dimensions(env_indices, side)

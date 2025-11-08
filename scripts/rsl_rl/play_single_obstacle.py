@@ -205,8 +205,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # Get robots_data and tibia indices once before simulation loop
     robots = env.unwrapped.scene["robot"]
-    left_tibia_indices = robots.find_bodies("TIBIA_LEFT")
-    right_tibia_indices = robots.find_bodies("TIBIA_RIGHT")
+    left_tibia_indices = robots.find_bodies("ELECTRONICS_LEFT")
+    right_tibia_indices = robots.find_bodies("ELECTRONICS_RIGHT")
     left_tibia_idx = left_tibia_indices[0] if len(left_tibia_indices) > 0 else None
     right_tibia_idx = right_tibia_indices[0] if len(right_tibia_indices) > 0 else None
     left_foot_pos = None
@@ -264,7 +264,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
                         link_quat_w[:, left_tibia_idx, :],
                         link_quat_w[:, right_tibia_idx, :]
                     ], dim=1)  # (num_envs, 2, 4)
-                    foot_offset_b = torch.tensor([0.0, 0.38485 + 0.004, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
+                    foot_offset_b = torch.tensor([0.0, 0.06 + 0.004, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
                     foot_offset_b = foot_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape)
                     rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
                     toe_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
@@ -338,7 +338,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     #if len(toe_endpoints_world_history) > 0:
 
     # Generate plots
-    #plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
+    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
     # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
     plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)

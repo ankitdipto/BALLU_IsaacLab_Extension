@@ -66,27 +66,27 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     #                                  track_air_time=True)
     
     # IMU sensors at the feet
-    imu_electronics_left = ImuCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
-        update_period=0.05,  # Corresponds to 20Hz
-        gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
-        debug_vis=True,
-        offset=ImuCfg.OffsetCfg(
-            pos=(0.0, 0.0, 0.0),
-            rot=(1.0, 0.0, 0.0, 0.0)
-        ),
-    )
+    # imu_electronics_left = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_LEFT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    #     offset=ImuCfg.OffsetCfg(
+    #         pos=(0.0, 0.0, 0.0),
+    #         rot=(1.0, 0.0, 0.0, 0.0)
+    #     ),
+    # )
     
-    imu_electronics_right = ImuCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
-        update_period=0.05,  # Corresponds to 20Hz
-        gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
-        debug_vis=True,
-        offset=ImuCfg.OffsetCfg(
-            pos=(0.0, 0.0, 0.0),
-            rot=(1.0, 0.0, 0.0, 0.0)
-        ),
-    )
+    # imu_electronics_right = ImuCfg(
+    #     prim_path="{ENV_REGEX_NS}/Robot/TIBIA_RIGHT",
+    #     update_period=0.05,  # Corresponds to 20Hz
+    #     gravity_bias=(0.0, 0.0, 0.0),  # Compensates 'g'. At rest, IMU reads (0.0, 0.0, 0.0)
+    #     debug_vis=True,
+    #     offset=ImuCfg.OffsetCfg(
+    #         pos=(0.0, 0.0, 0.0),
+    #         rot=(1.0, 0.0, 0.0, 0.0)
+    #     ),
+    # )
 
     # IMU sensors on femurs
     # imu_femur_left = ImuCfg(
@@ -150,21 +150,24 @@ class ObservationsCfg:
         joint_pos = ObsTerm(func=mdp.joint_pos)
         joint_vel = ObsTerm(func=mdp.joint_vel)
 
-        #base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
+        base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
         #actions = ObsTerm(func=mdp.last_action)
 
         # IMU sensor readings at the feet
-        left_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
-        left_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
-        left_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+        # left_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+        # left_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
+        # left_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_left")})
 
-        right_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
-        right_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
-        right_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+        # right_electronics_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+        # right_electronics_angular_velocity = ObsTerm(func=mdp.imu_ang_vel, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
+        # right_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
 
         # Ground truth IMU sensor readings
         imu_information_combined_flattened = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
+
+        # Phase of periodic reference trajectory
+        phase_of_periodic_reference_traj = ObsTerm(func=mdp.phase_of_periodic_reference_traj, params={"period": 40})
 
         # IMU sensor readings on tibias
         #left_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
@@ -209,6 +212,18 @@ class EventCfg:
 @configclass
 class RewardsCfg:
     """Reward terms for the MDP."""
+    # Reward to encourage progress towards goal
+    navigation_reward_l2 = RewTerm(
+        func=mdp.navigation_reward_l2,
+        weight=6.0,
+    )
+
+    # Reward to encourage goal directed velocity
+    goal_directed_velocity = RewTerm(
+        func=mdp.goal_directed_velocity,
+        weight=0.0,
+    )
+
     # Position tracking reward
     position_tracking_l2_singleObj = RewTerm(
         func=mdp.position_tracking_l2_singleObj,
@@ -225,7 +240,7 @@ class RewardsCfg:
     # Reward to encourage tracking the command direction
     forward_vel_base = RewTerm(
         func=mdp.forward_velocity_x,
-        weight=0.0,
+        weight=4.0,
     )
 
     # Rewards to encourage tracking the exact command velocity
@@ -240,13 +255,32 @@ class RewardsCfg:
     )
 
     # Reward to encourage high jump
-    # high_jump = RewTerm(
-    #     func=mdp.feet_z_pos_exp,
-    #     weight=1.0,
-    #     params={
-    #         "slope": 1.73
-    #     }
-    # )
+    high_jump_by_foot_lift = RewTerm(
+        func=mdp.feet_z_pos_exp_flat,
+        weight=0.0,
+        params={
+            "slope": 1.73
+        }
+    )
+
+    # Reward to jump by encouraging upward linear acceleration along the z-axis
+    upward_lin_accel_z = RewTerm(
+        func=mdp.upward_lin_accel_z,
+        weight=0.0,
+    )
+
+    # Reward to jump by encouraging root z position above nominal
+    root_z_pos_above_nominal = RewTerm(
+        func=mdp.root_z_pos_above_nominal,
+        weight=0.0,
+    )
+
+    # Reward to follow periodic reference trajectory
+    periodic_reference_traj = RewTerm(
+        func=mdp.periodic_reference_traj,
+        weight=0.0,
+        params={"period": 40},
+    )
 
     track_lin_vel_xy_world_exp = RewTerm(
         func=mdp.track_lin_vel_xy_world_exp_ballu, 

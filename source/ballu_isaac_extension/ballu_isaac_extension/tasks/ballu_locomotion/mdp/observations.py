@@ -93,12 +93,12 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
             all_dims.pelvis.height.unsqueeze(-1),
             all_dims.femur_left.height.unsqueeze(-1),
             all_dims.femur_right.height.unsqueeze(-1),
-            all_dims.tibia_left.cylinder.height.unsqueeze(-1),
-            all_dims.tibia_right.cylinder.height.unsqueeze(-1),
-            all_dims.tibia_left.box.size,
-            all_dims.tibia_right.box.size,
-            all_dims.tibia_left.sphere.radius.unsqueeze(-1),
-            all_dims.tibia_right.sphere.radius.unsqueeze(-1)
+            all_dims.tibia_left.height.unsqueeze(-1),
+            all_dims.tibia_right.height.unsqueeze(-1),
+            all_dims.electronics_left.box.size[:, 1].unsqueeze(-1),
+            all_dims.electronics_right.box.size[:, 1].unsqueeze(-1),
+            all_dims.electronics_left.sphere.radius.unsqueeze(-1),
+            all_dims.electronics_right.sphere.radius.unsqueeze(-1)
         ], dim=-1).to(env.device)
         MORPH_VECTOR = morphology_vector
     # print(f"Morphology vector shape: {MORPH_VECTOR.shape}")
@@ -125,3 +125,14 @@ def imu_information_combined(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg =
     assert imu_information_combined_flattened.shape == (env.num_envs, 20), f"IMU information combined shape mismatch, expected (num_envs, 20), got {imu_information_combined_flattened.shape}"
     # assert imu_lin_acc_b.allclose(imu_lin_acc_w), f"IMU linear acceleration mismatch, expected {imu_lin_acc_w}, got {imu_lin_acc_b}"
     return imu_information_combined_flattened
+
+def phase_of_periodic_reference_traj(env: ManagerBasedRLEnv, period: int) -> torch.Tensor:
+    """Phase of periodic reference trajectory"""
+    # extract the used quantities (to enable type-hinting)
+    try:
+        curr_env_step = env.episode_length_buf
+    except AttributeError:
+        curr_env_step = torch.zeros(env.num_envs, device=env.device, dtype=torch.long)
+    phase = curr_env_step % period
+    # print(f"Phase of periodic reference trajectory: {phase}")
+    return phase.unsqueeze(-1)

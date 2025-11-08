@@ -23,7 +23,12 @@ def get_robot_usd_path():
         return morphology_usd_path
     else:
         # Default to original robot
-        default_path = os.path.join(root_usd_path, "original", "original")
+        # default_path = os.path.join(root_usd_path, "original", "original")
+        default_path = os.path.join(
+            root_usd_path, "11.04.2025", 
+            "trial64_fl0.305_tl0.422_spc0.002_gcr0.859", 
+            "trial64_fl0.305_tl0.422_spc0.002_gcr0.859.usd"
+        )
         print(f"🤖 Using default robot USD: {default_path}")
         return default_path
 

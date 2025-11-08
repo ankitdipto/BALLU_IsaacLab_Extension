@@ -7,16 +7,19 @@ specify the reward function and its parameters.
 from __future__ import annotations
 
 import torch
+import math
 from typing import TYPE_CHECKING, cast, Any
 
 from isaaclab.managers import SceneEntityCfg
 from isaaclab.sensors.contact_sensor.contact_sensor import ContactSensor
 from isaaclab.sim.spawners.spawner_cfg import RigidObjectSpawnerCfg
 import isaaclab.utils.math as math_utils
-
+from .geometry_utils import get_robot_dimensions
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
+
+NOMINIAL_Z_POS = None
 
 def forward_velocity_x(
     env: ManagerBasedRLEnv,
@@ -67,6 +70,69 @@ def feet_z_pos_exp(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityC
     # rew = torch.exp(slope * min_feet_z_pos_w) - 1
     rew = torch.nan_to_num(rew, nan=0.0)
     # assert rew has no nan
+    assert not torch.isnan(rew).any()
+    return rew
+
+def feet_z_pos_exp_flat(env: ManagerBasedRLEnv, slope: float, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward feet z position."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    tibia_ids, _ = asset.find_bodies("ELECTRONICS_(LEFT|RIGHT)") # (2,)
+    tibia_pos_w = asset.data.body_link_pos_w[:,tibia_ids, :] # (num_envs, 2, 3)
+    tibia_quat_w = asset.data.body_link_quat_w[:,tibia_ids, :] # (num_envs, 2, 4)
+    feet_offset_b = torch.tensor([0.0, 0.03 + 0.004, 0.0], 
+                                device=env.device, dtype=tibia_pos_w.dtype)
+    feet_offset_b = feet_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape) # (num_envs, 2, 3)
+    pose_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), feet_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+    feet_pos_w = tibia_pos_w + pose_offset_w # (num_envs, 2, 3)
+    feet_z_pos_w = feet_pos_w[:, :, 2] # (num_envs, 2)
+
+    min_feet_z_pos_w = feet_z_pos_w.min(dim = 1)[0]
+    rew = torch.where(min_feet_z_pos_w > 1.8, 
+                                        0.0, 
+                                        torch.exp(slope * min_feet_z_pos_w) - 1)
+    # rew = torch.exp(slope * min_feet_z_pos_w) - 1
+    rew = torch.nan_to_num(rew, nan=0.0)
+    # assert rew has no nan
+    assert not torch.isnan(rew).any()
+    return rew
+
+def root_z_pos_above_nominal(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward pelvis z position above nominal."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    dims = get_robot_dimensions(slice(0, env.num_envs))
+    # print(f"[DEBUG] dims shapes: {dims.femur_left.height.shape}, {dims.tibia_left.height.shape}, {dims.electronics_left.box.size[:, 1].shape}, {dims.electronics_left.sphere.radius.shape}")
+    global NOMINIAL_Z_POS
+    if NOMINIAL_Z_POS is None:
+        NOMINIAL_Z_POS = dims.femur_left.height.to(env.device) + dims.tibia_left.height.to(env.device) + \
+                    dims.electronics_left.box.size[:, 1].to(env.device) + \
+                    dims.electronics_left.sphere.radius.to(env.device)
+    # print(f"[DEBUG] root_pos_w shapes: {asset.data.root_pos_w[:, 2].shape}")
+    # print(f"[DEBUG] nominal_z_pos shapes: {nominal_z_pos.shape}")
+    rew = 1.0 - torch.abs(asset.data.root_pos_w[:, 2] - 0.50) / 0.50
+    rew = torch.nan_to_num(rew, nan=0.0)
+    assert not torch.isnan(rew).any()
+    return rew
+
+def periodic_reference_traj(env: ManagerBasedRLEnv, period: int, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward periodic reference trajectory."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    curr_env_step = env.episode_length_buf
+    global NOMINIAL_Z_POS
+    if NOMINIAL_Z_POS is None:
+        dims = get_robot_dimensions(slice(0, env.num_envs))
+        NOMINIAL_Z_POS = dims.femur_left.height.to(env.device) + dims.tibia_left.height.to(env.device) + \
+                    dims.electronics_left.cylinder.height.to(env.device) + \
+                    dims.electronics_left.sphere.radius.to(env.device)
+    # Step function: oscillates between 0.50 and 1.0
+    # First half of period: 1.0, second half: 0.50
+    reference_traj = torch.where((curr_env_step % period) < (period // 2), 
+                                 torch.tensor(NOMINIAL_Z_POS - 0.25, device=env.device, dtype=torch.float32),
+                                 torch.tensor(NOMINIAL_Z_POS + 0.25, device=env.device, dtype=torch.float32))
+
+    error = torch.abs(asset.data.root_pos_w[:, 2] - reference_traj)
+    rew = 0.25 - error
+    rew = torch.nan_to_num(rew, nan=0.0)
+    rew = torch.clip(rew, min=-1.0)
     assert not torch.isnan(rew).any()
     return rew
 
@@ -266,3 +332,36 @@ def ang_vel_z_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntity
     # extract the used quantities (to enable type-hinting)
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     return torch.square(asset.data.root_ang_vel_b[:, 2])
+
+def upward_lin_accel_z(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward upward linear acceleration along the z-axis."""
+    # extract the used quantities (to enable type-hinting)
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    pelvis_id, _ = asset.find_bodies("PELVIS") # (1,)
+    pelvis_lin_accel_z = asset.data.body_lin_acc_w[:, pelvis_id, 2]
+    rew = torch.where(pelvis_lin_accel_z > 0.0, pelvis_lin_accel_z, 0.0)
+    rew = torch.nan_to_num(rew, nan=0.0).squeeze()
+    assert not torch.isnan(rew).any()
+    return rew
+
+def navigation_reward_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward progress towards goal using L2 norm."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    goal_pos_w = env.scene.env_origins[:, :2] + torch.tensor([4.0, 0.0], device=env.device, dtype=env.scene.env_origins.dtype)
+    error = torch.norm(goal_pos_w - asset.data.root_pos_w[:, :2], p=2, dim=1)
+    rew = 1.0 - 0.25 * error
+    rew = torch.nan_to_num(rew, nan=0.0)
+    rew = torch.clip(rew, min=-6.0)
+    return rew
+
+def goal_directed_velocity(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward goal directed velocity."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    goal_pos_w = env.scene.env_origins[:, :2] + torch.tensor([4.0, 0.0], device=env.device, dtype=env.scene.env_origins.dtype)
+    robot_velocity = asset.data.root_lin_vel_w[:, :2]
+    goal_direction = goal_pos_w - asset.data.root_pos_w[:, :2]
+    goal_direction = goal_direction / torch.norm(goal_direction, p=2, dim=1).unsqueeze(1)
+    reward = torch.sum(robot_velocity * goal_direction, dim=1)
+    reward = torch.nan_to_num(reward, nan=0.0)
+    reward = torch.where(reward >= 0.0, reward, torch.exp(reward) - 1)
+    return reward

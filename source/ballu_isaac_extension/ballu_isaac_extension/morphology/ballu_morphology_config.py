@@ -49,7 +49,7 @@ class LinkDensities:
     TIBIA: Final[float] = 329.3 * (5.0 / 8.28)  # Updated to match femur density; previous was 400 
     ELECTRONICS: Final[float] = 5900.0 * (9.0 / 7.0)  # New density reported by Yusuke
     MOTORARM: Final[float] = 1666.7
-    BALLOON_EFFECTIVE: Final[float] = 0.706 / 3.0
+    BALLOON_EFFECTIVE: Final[float] = (0.706 / 3.0) * 1.8
 
 # Global constant for easy access
 DENSITIES: Final = LinkDensities()

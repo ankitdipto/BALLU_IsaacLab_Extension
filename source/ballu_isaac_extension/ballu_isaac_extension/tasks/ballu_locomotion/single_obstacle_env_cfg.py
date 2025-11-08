@@ -194,6 +194,9 @@ class ObservationsCfg:
         # IMU readings collected from the simulator's privileged underlying physics engine
         imu_info_from_api = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
 
+        # phase of periodic reference trajectory
+        phase_of_periodic_reference_traj = ObsTerm(func=mdp.phase_of_periodic_reference_traj, params={"period": 40})
+
         # What action did the robot take last?
         last_action = ObsTerm(func=mdp.last_action)
 
@@ -214,6 +217,24 @@ class EventCfg:
         mode="reset"
     )
 
+    # startup
+    physics_material = EventTerm(
+        func=mdp.randomize_rigid_body_material,
+        mode="startup",
+        params={
+            "asset_cfg": SceneEntityCfg("robot", body_names=[
+                "TIBIA_LEFT", 
+                "TIBIA_RIGHT",
+                "ELECTRONICS_LEFT",
+                "ELECTRONICS_RIGHT"
+            ]),
+            "static_friction_range": (0.1, 0.6),
+            "dynamic_friction_range": (0.1, 0.6),
+            "restitution_range": (0.0, 0.0),
+            "num_buckets": 64,
+        },
+    )
+
 
 @configclass
 class RewardsCfg:
@@ -230,12 +251,19 @@ class RewardsCfg:
     )
 
     # Shaping reward - jump to clear the obstacle
-    high_jump = RewTerm(
+    high_jump_by_feet_lift = RewTerm(
         func=mdp.feet_z_pos_exp,
         weight=1.0,
         params={
             "slope": 1.73
         }
+    )
+
+    # Reward to encourage following periodic reference trajectory
+    periodic_reference_traj = RewTerm(
+        func=mdp.periodic_reference_traj,
+        weight=5.0,
+        params={"period": 40}
     )
 
     # Reward to encourage tracking the command direction
@@ -383,7 +411,10 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
                             size=(sx, sy, height_i),
                             collision_props=sim_utils.CollisionPropertiesCfg(),
                             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
-                            physics_material=sim_utils.RigidBodyMaterialCfg(),
+                            physics_material=sim_utils.RigidBodyMaterialCfg(
+                                static_friction=0.1,
+                                dynamic_friction=0.1
+                            ),
                             visual_material=sim_utils.PreviewSurfaceCfg(
                                 diffuse_color=(0.2, 0.2, 0.2),
                                 roughness=0.2,

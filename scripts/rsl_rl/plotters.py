@@ -47,6 +47,22 @@ def plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, joint_names, num_env
         plt.savefig(plot_path)
         plt.close()
         print(f"[INFO] Saved joint plots for environment {env_idx} to {plot_path}")
+        
+        # Velocity plot - separate figure
+        plt.figure(figsize=(20, 6))
+        for joint_idx in range(joint_vel_hist_tch.shape[2]):
+            plt.plot(joint_vel_hist_tch[:, env_idx, joint_idx], label=f'{joint_names[joint_idx]}', color=colors[joint_idx % len(colors)], linewidth=2.0)
+        plt.title(f'Joint Velocities Over Time (Env {env_idx})')
+        plt.xlabel('Timestep')
+        plt.ylabel('Velocity (rad/s)')
+        plt.legend()
+        plt.grid(True)
+        
+        plt.tight_layout()
+        vel_plot_path = os.path.join(save_dir, f"joint_velocities_env_{env_idx}.png")
+        plt.savefig(vel_plot_path)
+        plt.close()
+        print(f"[INFO] Saved joint velocity plots for environment {env_idx} to {vel_plot_path}")
 
 def plot_root_com_xy(root_com_xyz_hist_tch, num_envs, save_dir):
     """Plot root COM X,Y positions for all environments in a single figure.
