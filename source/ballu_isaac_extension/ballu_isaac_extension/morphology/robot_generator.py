@@ -269,12 +269,11 @@ class BalluRobotGenerator:
             length=g.tibia_length,
         )
         
-        # Electronics: box along Y-axis
-        self.electronics_inertia = calc.box(
+        # Electronics: cylinder along Y-axis
+        self.electronics_inertia = calc.cylinder_y_axis(
             mass=m.electronics_mass,
-            x_size=g.electronics_width,
-            y_size=g.electronics_length,
-            z_size=g.electronics_height,
+            radius=g.electronics_radius,
+            length=g.electronics_length,
         )
         
         # Balloon: large cylinder along Y-axis (oriented downward)
@@ -627,31 +626,28 @@ Description: {1}
             if self.use_visual_meshes:
                 # Electronics don't have meshes, use primitive geometry
                 self._create_visual_primitive(
-                    link, "box", "color_electronics",
+                    link, "cylinder", "color_electronics",
                     origin=self.electronics_collision_center,
-                    rpy=(0, 0, 0),
-                    x=self.morph.geometry.electronics_width,
-                    y=self.morph.geometry.electronics_length,
-                    z=self.morph.geometry.electronics_height
+                    rpy=(math.pi/2, 0, 0),
+                    radius=self.morph.geometry.electronics_radius,
+                    length=self.morph.geometry.electronics_length
                 )
             else:
                 self._create_visual_primitive(
-                    link, "box", "color_electronics",
+                    link, "cylinder", "color_electronics",
                     origin=self.electronics_collision_center,
-                    rpy=(0, 0, 0),
-                    x=self.morph.geometry.electronics_width,
-                    y=self.morph.geometry.electronics_length,
-                    z=self.morph.geometry.electronics_height
+                    rpy=(math.pi/2, 0, 0),
+                    radius=self.morph.geometry.electronics_radius,
+                    length=self.morph.geometry.electronics_length
                 )
             
-            # Collision 1: Electronics box
-            self._create_collision_box(
+            # Collision 1: Electronics cylinder
+            self._create_collision_cylinder(
                 link,
-                x_size=self.morph.geometry.electronics_width,
-                y_size=self.morph.geometry.electronics_length,
-                z_size=self.morph.geometry.electronics_height,
+                radius=self.morph.geometry.electronics_radius,
+                length=self.morph.geometry.electronics_length,
                 origin=self.electronics_collision_center,
-                rpy=(0, 0, 0)
+                rpy=(math.pi/2, 0, 0)
             )
             
             # Collision 2: Foot sphere (moved from tibia)

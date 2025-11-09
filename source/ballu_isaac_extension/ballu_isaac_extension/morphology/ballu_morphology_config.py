@@ -67,9 +67,8 @@ class GeometryParams:
     foot_radius: float = 0.004     # Contact sphere radius
     
     # Electronics dimensions (in meters)
-    electronics_length: float = 0.06   # Electronics box length along Y-axis
-    electronics_width: float = 0.01    # Electronics box width along X-axis
-    electronics_height: float = 0.01   # Electronics box height along Z-axis
+    electronics_length: float = 0.06   # Electronics cylinder height along Y-axis
+    electronics_radius: float = 0.005  # Electronics cylinder radius
     
     # Pelvis/Body dimensions
     pelvis_height: float = 0.15    # Main body cylinder height
@@ -224,7 +223,7 @@ class BalluMorphology:
         pelvis_volume = math.pi * g.pelvis_radius**2 * g.pelvis_height
         femur_volume = math.pi * g.limb_radius**2 * g.femur_length
         tibia_volume = math.pi * g.limb_radius**2 * g.tibia_length
-        electronics_volume = g.electronics_width * g.electronics_length * g.electronics_height
+        electronics_volume = math.pi * g.electronics_radius**2 * g.electronics_length
         balloon_volume = math.pi * g.balloon_radius**2 * g.balloon_height
         motorarm_volume = g.motorarm_length * g.motorarm_width * g.motorarm_height
         
@@ -313,10 +312,8 @@ class BalluMorphology:
         # Electronics constraints
         if self.geometry.electronics_length <= 0:
             errors.append("electronics_length must be positive")
-        if self.geometry.electronics_width <= 0:
-            errors.append("electronics_width must be positive")
-        if self.geometry.electronics_height <= 0:
-            errors.append("electronics_height must be positive")
+        if self.geometry.electronics_radius <= 0:
+            errors.append("electronics_radius must be positive")
                     
         # Geometric ratios
         total_leg_length = self.geometry.get_total_leg_length()
@@ -436,8 +433,7 @@ class MorphologyParameterRanges:
     
     # Electronics ranges (min, max, default)
     electronics_length: Tuple[float, float, float] = (0.03, 0.12, 0.06)
-    electronics_width: Tuple[float, float, float] = (0.005, 0.02, 0.01)
-    electronics_height: Tuple[float, float, float] = (0.005, 0.02, 0.01)
+    electronics_radius: Tuple[float, float, float] = (0.003, 0.01, 0.005)
     
     pelvis_height: Tuple[float, float, float] = (0.08, 0.25, 0.15)
     pelvis_radius: Tuple[float, float, float] = (0.003, 0.01, 0.005)
@@ -483,8 +479,7 @@ class MorphologyParameterRanges:
                 hip_width=ranges["hip_width"][2],
                 foot_radius=ranges["foot_radius"][2],
                 electronics_length=ranges["electronics_length"][2],
-                electronics_width=ranges["electronics_width"][2],
-                electronics_height=ranges["electronics_height"][2],
+                electronics_radius=ranges["electronics_radius"][2],
                 pelvis_height=ranges["pelvis_height"][2],
                 pelvis_radius=ranges["pelvis_radius"][2],
                 balloon_radius=ranges["balloon_radius"][2],

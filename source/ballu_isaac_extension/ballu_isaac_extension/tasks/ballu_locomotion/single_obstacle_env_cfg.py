@@ -91,7 +91,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
 
     # contact sensors at feet
     contact_forces_tibia = ContactSensorCfg(
-        prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
+        prim_path="{ENV_REGEX_NS}/Robot/ELECTRONICS_(LEFT|RIGHT)", 
         update_period=0.05, # 20 Hz
         debug_vis=True
     )
