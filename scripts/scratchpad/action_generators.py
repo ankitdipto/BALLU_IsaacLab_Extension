@@ -29,9 +29,9 @@ def stepper(step_count, period=200, num_envs=1):
     """
     actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
     if step_count % period < period / 2:
-        actions[:, 0] = 0.8
+        actions[:, 0] = 1.0
     else:
-        actions[:, 1] = 0.8
+        actions[:, 1] = 1.0
     return actions
 
 def bang_bang_control(step_count, num_envs=1):
