@@ -164,7 +164,7 @@ class ObservationsCfg:
         # right_electronics_linear_acceleration = ObsTerm(func=mdp.imu_lin_acc, params={"asset_cfg": SceneEntityCfg("imu_electronics_right")})
 
         # Ground truth IMU sensor readings
-        imu_information_combined_flattened = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
+        #imu_information_combined_flattened = ObsTerm(func=mdp.imu_information_combined, params={"asset_cfg": SceneEntityCfg("robot")})
 
         # Phase of periodic reference trajectory
         phase_of_periodic_reference_traj = ObsTerm(func=mdp.phase_of_periodic_reference_traj, params={"period": 40})
@@ -215,7 +215,7 @@ class RewardsCfg:
     # Reward to encourage progress towards goal
     navigation_reward_l2 = RewTerm(
         func=mdp.navigation_reward_l2,
-        weight=6.0,
+        weight=0.0,
     )
 
     # Reward to encourage goal directed velocity
