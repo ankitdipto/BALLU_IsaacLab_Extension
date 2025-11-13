@@ -8,7 +8,7 @@ from . import agents
 
 # Register the BALLU environments
 gym.register(
-    id="Isc-Vel-BALLU-encoder",
+    id="Isc-BALLU-general",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
@@ -94,5 +94,35 @@ gym.register(
     kwargs={
         "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_env_cfg:BalluSingleObstacleHeteroEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-Vel-BALLU-obstacle-imu-dbg",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obstacle_imu_dbg_env_cfg:BalluObstacleImuDbgEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-Vel-BALLU-obstacle-real-imu",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.single_obstacle_real_imu_env_cfg:BalluSingleObstacleRealImuEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-fast-walk",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.flat_env_cfg:BalluFlatEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerWalkingCfg"
     }
 )
