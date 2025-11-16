@@ -45,6 +45,7 @@ sys.argv = [sys.argv[0]] + hydra_args
 import gymnasium as gym
 import os
 import torch
+from tqdm import tqdm
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -122,21 +123,24 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     try:
         # simulate environment
-        while simulation_app.is_running():
-            # run everything in inference mode
-            with torch.inference_mode():
-                # agent stepping
-                actions = policy(obs)
-                # env stepping
-                obs, rewards, _, _ = env.step(actions)
-            
-                # accumulate rewards
-                cumulative_rewards += rewards
-            
-                timestep += 1
+        with tqdm(total=args_cli.video_length, desc="Processing") as pbar:
+            while simulation_app.is_running():
+                # run everything in inference mode
+                with torch.inference_mode():
+                    # agent stepping
+                    actions = policy(obs)
+                    # env stepping
+                    obs, rewards, _, _ = env.step(actions)
                 
-                if args_cli.video and timestep == args_cli.video_length:
-                    break
+                    # accumulate rewards
+                    cumulative_rewards += rewards
+                
+                    timestep += 1
+                    
+                    if args_cli.video and timestep == args_cli.video_length:
+                        break
+                    pbar.update(1)
+                    
     except Exception as e:
         print(f"[INFO] Exception received: {e}")
     finally:

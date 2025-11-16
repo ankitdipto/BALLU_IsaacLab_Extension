@@ -68,7 +68,11 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
     #                                  history_length=3, 
     #                                  track_air_time=True)
-
+    contact_forces_tibia = ContactSensorCfg(
+        prim_path="{ENV_REGEX_NS}/Robot/ELECTRONICS_(LEFT|RIGHT)", 
+        update_period=0.05, # 20 Hz
+        debug_vis=True
+    )
 
     # Generated obstacles are added as individual AssetBaseCfg entries in __post_init__
     obstacles = None
@@ -135,7 +139,7 @@ class ObservationsCfg:
         last_action = ObsTerm(func=mdp.last_action)
 
         # Morphology vector
-        # morphology_vector = ObsTerm(func=mdp.morphology_vector_priv)
+        morphology_vector = ObsTerm(func=mdp.morphology_vector_priv)
 
         def __post_init__(self):
             self.enable_corruption = False
@@ -252,7 +256,7 @@ class BalluSingleObstacleHeteroEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
     """Configuration for the BALLU robot environment with indirect actuation."""
 
     # Scene settings
-    scene: BALLUSceneCfg = BALLUSceneCfg(num_envs=4096, env_spacing=4.0)
+    scene: BALLUSceneCfg = BALLUSceneCfg(num_envs=4096, env_spacing=4.0, replicate_physics=True)
     # Basic settings
     observations: ObservationsCfg = ObservationsCfg()
     actions: ActionsCfg = ActionsCfg() # Use updated ActionsCfg

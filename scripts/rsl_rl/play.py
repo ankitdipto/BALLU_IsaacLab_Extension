@@ -48,6 +48,7 @@ import gymnasium as gym
 import os
 import torch
 import pandas as pd
+from tqdm import tqdm
 
 from rsl_rl.runners import OnPolicyRunner
 
@@ -189,98 +190,99 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     cum_rewards = 0
     robot_jnt_names = []
     # simulate environment
-    while simulation_app.is_running():
+    with tqdm(total=args_cli.video_length, desc="Processing") as pbar:
+        while simulation_app.is_running():
         # run everything in inference mode
-        with torch.inference_mode():
-            # agent stepping
-            actions = policy(obs)
-            # actions = stepper(timestep,
-            #                   period=40,
-            #                   num_envs=env.num_envs)
-            # env stepping
-            obs, rew, _, _ = env.step(actions)
-            # Store rewards for plotting
-            #all_rewards.append(rewards.mean().item())  # Store the mean reward across environments
-            timestep += 1
-            cum_rewards += rew
-            # Extract robot's joint positions and joint velocities
-            robots_data = env.unwrapped.scene["robot"].data
-            joint_pos = robots_data.joint_pos.clone().detach().cpu()
-            joint_vel = robots_data.joint_vel.clone().detach().cpu()
-            root_com_xyz = robots_data.root_com_state_w.detach().cpu()[..., :3]
-            # body_states = robots_data.body_link_state_w.clone().detach().cpu()
-            base_vel = robots_data.root_lin_vel_b.clone().detach().cpu()
-            comp_torq = robots_data.computed_torque.clone().detach().cpu()
-            applied_torq = robots_data.applied_torque.clone().detach().cpu()
-            # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            # print("Torques from play.py")
-            # print(f"Computed torque: {comp_torq.cpu().numpy()}")
-            # print(f"Applied torque: {applied_torq.cpu().numpy()}")
-            # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
-            # Print body names once for debugging
-            if timestep == 1:
-                print("Available body names:", robots_data.body_names)
-                robot_jnt_names = robots_data.joint_names
-            # Extract toe endpoints (world) from tibia link poses if indices available
-            if left_tibia_idx is not None and right_tibia_idx is not None:
-                link_pos_w = robots.data.body_link_pos_w  # (num_envs, num_bodies, 3)
-                link_quat_w = robots.data.body_link_quat_w  # (num_envs, num_bodies, 4) wxyz
-                tibia_pos_w = torch.stack([
-                    link_pos_w[:, left_tibia_idx, :],
-                    link_pos_w[:, right_tibia_idx, :]
-                ], dim=1)  # (num_envs, 2, 3)
-                tibia_quat_w = torch.stack([
-                    link_quat_w[:, left_tibia_idx, :],
-                    link_quat_w[:, right_tibia_idx, :]
-                ], dim=1)  # (num_envs, 2, 4)
-                foot_offset_b = torch.tensor([0.0, 0.06 + 0.004, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
-                foot_offset_b = foot_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape)
-                rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
-                toe_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
-                toe_endpoints_world_history.append(toe_endpoints_w.detach().cpu())
-                # Keep backward-compatible single foot positions for any other plots if needed
-                left_foot_pos = toe_endpoints_w[:, 0, :]
-                right_foot_pos = toe_endpoints_w[:, 1, :]
+            with torch.inference_mode():
+                # agent stepping
+                actions = policy(obs)
+                # actions = stepper(timestep,
+                #                   period=40,
+                #                   num_envs=env.num_envs)
+                # env stepping
+                obs, rew, _, _ = env.step(actions)
+                # Store rewards for plotting
+                #all_rewards.append(rewards.mean().item())  # Store the mean reward across environments
+                timestep += 1
+                cum_rewards += rew
+                # Extract robot's joint positions and joint velocities
+                robots_data = env.unwrapped.scene["robot"].data
+                joint_pos = robots_data.joint_pos.clone().detach().cpu()
+                joint_vel = robots_data.joint_vel.clone().detach().cpu()
+                root_com_xyz = robots_data.root_com_state_w.detach().cpu()[..., :3]
+                # body_states = robots_data.body_link_state_w.clone().detach().cpu()
+                base_vel = robots_data.root_lin_vel_b.clone().detach().cpu()
+                comp_torq = robots_data.computed_torque.clone().detach().cpu()
+                applied_torq = robots_data.applied_torque.clone().detach().cpu()
+                # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+                # print("Torques from play.py")
+                # print(f"Computed torque: {comp_torq.cpu().numpy()}")
+                # print(f"Applied torque: {applied_torq.cpu().numpy()}")
+                # print("%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%")
+                # Print body names once for debugging
+                if timestep == 1:
+                    print("Available body names:", robots_data.body_names)
+                    robot_jnt_names = robots_data.joint_names
+                # Extract toe endpoints (world) from tibia link poses if indices available
+                if left_tibia_idx is not None and right_tibia_idx is not None:
+                    link_pos_w = robots.data.body_link_pos_w  # (num_envs, num_bodies, 3)
+                    link_quat_w = robots.data.body_link_quat_w  # (num_envs, num_bodies, 4) wxyz
+                    tibia_pos_w = torch.stack([
+                        link_pos_w[:, left_tibia_idx, :],
+                        link_pos_w[:, right_tibia_idx, :]
+                    ], dim=1)  # (num_envs, 2, 3)
+                    tibia_quat_w = torch.stack([
+                        link_quat_w[:, left_tibia_idx, :],
+                        link_quat_w[:, right_tibia_idx, :]
+                    ], dim=1)  # (num_envs, 2, 4)
+                    foot_offset_b = torch.tensor([0.0, 0.06 + 0.004, 0.0], device=tibia_pos_w.device, dtype=tibia_pos_w.dtype)
+                    foot_offset_b = foot_offset_b.unsqueeze(0).unsqueeze(0).expand(tibia_pos_w.shape)
+                    rot_offset_w = math_utils.quat_apply(tibia_quat_w.reshape(-1, 4), foot_offset_b.reshape(-1, 3)).reshape_as(tibia_pos_w)
+                    toe_endpoints_w = tibia_pos_w + rot_offset_w  # (num_envs, 2, 3)
+                    toe_endpoints_world_history.append(toe_endpoints_w.detach().cpu())
+                    # Keep backward-compatible single foot positions for any other plots if needed
+                    left_foot_pos = toe_endpoints_w[:, 0, :]
+                    right_foot_pos = toe_endpoints_w[:, 1, :]
 
-            # --- DebugDraw visualization for feet ---
-            # if left_foot_pos is not None:
-            #     for env_idx in range(left_foot_pos.shape[0]):
-            #         pos = left_foot_pos[env_idx].cpu().numpy().tolist()
-            #         debug_draw_instance.draw_sphere(
-            #             position=pos,
-            #             color=[1.0, 0.5, 0.0, 1.0],  # Orange RGBA
-            #             radius=0.025
-            #         )
-            # if right_foot_pos is not None:
-            #     for env_idx in range(right_foot_pos.shape[0]):
-            #         pos = right_foot_pos[env_idx].cpu().numpy().tolist()
-            #         debug_draw_instance.draw_sphere(
-            #             position=pos,
-            #             color=[0.0, 0.8, 0.0, 1.0],  # Green RGBA
-            #             radius=0.025
-            #         )
-            # Store positions (ensure shape [1, envs, 3] per step for plotting)
-            if left_foot_pos is not None and right_foot_pos is not None:
-                left_foot_pos_history.append(left_foot_pos.unsqueeze(0))
-                right_foot_pos_history.append(right_foot_pos.unsqueeze(0))
-            else:
-                left_foot_pos_history.append(None)
-                right_foot_pos_history.append(None)
-            # Store joint positions and velocities
-            joint_pos_history.append(joint_pos)
-            joint_vel_history.append(joint_vel)
-            root_com_xyz_history.append(root_com_xyz)
-            base_vel_history.append(base_vel)
-            actions_history.append(actions)
-            comp_torq_history.append(comp_torq)
-            applied_torq_history.append(applied_torq)
-        if args_cli.video:
-            # Exit the play loop after recording one video
-            if timestep == args_cli.video_length:
-                break
-
-        #if timestep == 400: # TODO: Remove this
-        #    break
+                # --- DebugDraw visualization for feet ---
+                # if left_foot_pos is not None:
+                #     for env_idx in range(left_foot_pos.shape[0]):
+                #         pos = left_foot_pos[env_idx].cpu().numpy().tolist()
+                #         debug_draw_instance.draw_sphere(
+                #             position=pos,
+                #             color=[1.0, 0.5, 0.0, 1.0],  # Orange RGBA
+                #             radius=0.025
+                #         )
+                # if right_foot_pos is not None:
+                #     for env_idx in range(right_foot_pos.shape[0]):
+                #         pos = right_foot_pos[env_idx].cpu().numpy().tolist()
+                #         debug_draw_instance.draw_sphere(
+                #             position=pos,
+                #             color=[0.0, 0.8, 0.0, 1.0],  # Green RGBA
+                #             radius=0.025
+                #         )
+                # Store positions (ensure shape [1, envs, 3] per step for plotting)
+                if left_foot_pos is not None and right_foot_pos is not None:
+                    left_foot_pos_history.append(left_foot_pos.unsqueeze(0))
+                    right_foot_pos_history.append(right_foot_pos.unsqueeze(0))
+                else:
+                    left_foot_pos_history.append(None)
+                    right_foot_pos_history.append(None)
+                # Store joint positions and velocities
+                joint_pos_history.append(joint_pos)
+                joint_vel_history.append(joint_vel)
+                root_com_xyz_history.append(root_com_xyz)
+                base_vel_history.append(base_vel)
+                actions_history.append(actions)
+                comp_torq_history.append(comp_torq)
+                applied_torq_history.append(applied_torq)
+            if args_cli.video:
+                # Exit the play loop after recording one video
+                if timestep == args_cli.video_length:
+                    break
+            pbar.update(1)
+            #if timestep == 400: # TODO: Remove this
+            #    break
 
     # Before closing the simulator evaluate the performance
     # successes, local_positions = threshold_based_verification(env.unwrapped)
@@ -302,7 +304,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     #if len(toe_endpoints_world_history) > 0:
 
     # Generate plots
-    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
+    #plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
     plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
     # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
     plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)
@@ -353,8 +355,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     
     base_vel_mean = base_vel_hist_tch.mean(dim=0)
     base_vel_std = base_vel_hist_tch.std(dim=0)
-    print("base_vel_mean of RL policy: ", base_vel_mean)
-    print("base_vel_std of RL policy: ", base_vel_std)
+    print(f"base_vel_mean: {base_vel_mean[0][0].item()}")
+    print(f"base_vel_std: {base_vel_std[0][0].item()}")
     print("cumulative rewards of RL policy: ", cum_rewards)
     # print("success rate of RL policy: ", success_rate)
 

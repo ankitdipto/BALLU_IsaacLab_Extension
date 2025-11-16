@@ -161,22 +161,22 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            #actions = stepper(count, period = 40, num_envs=args_cli.num_envs)
+            #actions = stepper(count, period = 80, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
             # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
-            # if count % env.max_episode_length <= 150:
-            #     actions = both_legs_1(num_envs=args_cli.num_envs)
-            # else:
-            #     actions = both_legs_0(num_envs=args_cli.num_envs)
-            # ---- Best action sequence for jumping ----
-            if count % env.max_episode_length <= 80:
-                actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
-            elif count % env.max_episode_length <= 85:
+            if count % env.max_episode_length <= 150:
                 actions = both_legs_0(num_envs=args_cli.num_envs)
             else:
-                actions = both_legs_1(num_envs = args_cli.num_envs)
+                actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            # ---- Best action sequence for jumping ----
+            # if count % env.max_episode_length <= 80:
+            #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)
+            # elif count % env.max_episode_length <= 85:
+            #     actions = both_legs_0(num_envs=args_cli.num_envs)
+            # else:
+            #     actions = both_legs_1(num_envs = args_cli.num_envs)
 
             # if count % 200 <= 90:
             #     actions = both_legs_theta(theta=0.8, num_envs=args_cli.num_envs)

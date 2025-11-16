@@ -344,14 +344,18 @@ def upward_lin_accel_z(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = Scene
     assert not torch.isnan(rew).any()
     return rew
 
-def navigation_reward_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+def navigation_reward_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"), begin_iter: int|None = None, ramp_width: int|None = None) -> torch.Tensor:
     """Reward progress towards goal using L2 norm."""
+    if begin_iter is not None and env.rsl_rl_iteration < begin_iter:
+        return torch.zeros(env.num_envs, device=env.device, dtype=torch.float32)
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
     goal_pos_w = env.scene.env_origins[:, :2] + torch.tensor([4.0, 0.0], device=env.device, dtype=env.scene.env_origins.dtype)
     error = torch.norm(goal_pos_w - asset.data.root_pos_w[:, :2], p=2, dim=1)
     rew = 1.0 - 0.25 * error
     rew = torch.nan_to_num(rew, nan=0.0)
     rew = torch.clip(rew, min=-6.0)
+    if ramp_width is not None and env.rsl_rl_iteration < begin_iter + ramp_width:
+        rew = rew * (env.rsl_rl_iteration - begin_iter) / ramp_width
     return rew
 
 def goal_directed_velocity(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:

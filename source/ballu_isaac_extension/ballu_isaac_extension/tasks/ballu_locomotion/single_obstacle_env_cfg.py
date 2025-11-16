@@ -228,8 +228,8 @@ class EventCfg:
                 "ELECTRONICS_LEFT",
                 "ELECTRONICS_RIGHT"
             ]),
-            "static_friction_range": (0.1, 0.6),
-            "dynamic_friction_range": (0.1, 0.6),
+            "static_friction_range": (0.3, 0.7),
+            "dynamic_friction_range": (0.3, 0.7),
             "restitution_range": (0.0, 0.0),
             "num_buckets": 64,
         },
@@ -412,8 +412,8 @@ class BalluSingleObstacleEnvCfg(ManagerBasedRLEnvCfg): # Renamed class
                             collision_props=sim_utils.CollisionPropertiesCfg(),
                             rigid_props=sim_utils.RigidBodyPropertiesCfg(kinematic_enabled=True),
                             physics_material=sim_utils.RigidBodyMaterialCfg(
-                                static_friction=0.1,
-                                dynamic_friction=0.1
+                                static_friction=0.5,
+                                dynamic_friction=0.5
                             ),
                             visual_material=sim_utils.PreviewSurfaceCfg(
                                 diffuse_color=(0.2, 0.2, 0.2),

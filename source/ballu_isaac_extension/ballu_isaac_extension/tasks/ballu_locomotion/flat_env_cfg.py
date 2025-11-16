@@ -215,7 +215,11 @@ class RewardsCfg:
     # Reward to encourage progress towards goal
     navigation_reward_l2 = RewTerm(
         func=mdp.navigation_reward_l2,
-        weight=0.0,
+        weight=5.0,
+        params={
+            "begin_iter": 300,
+            "ramp_width": 400
+        }
     )
 
     # Reward to encourage goal directed velocity

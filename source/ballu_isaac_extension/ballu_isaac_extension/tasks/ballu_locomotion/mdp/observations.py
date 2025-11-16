@@ -17,6 +17,8 @@ if TYPE_CHECKING:
 Root state.
 """
 MORPH_VECTOR: torch.Tensor | None = None
+SPRING_COEFF: torch.Tensor | None = None
+BUOY_MASSES: torch.Tensor | None = None
 
 def feet_air_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces")) -> torch.Tensor:
     """Feet air time"""
@@ -83,10 +85,59 @@ def goal_location_w_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
     assert goal_pos_w.shape == (env.num_envs, 2), f"Goal position shape mismatch, expected (num_envs, 2), got {goal_pos_w.shape}"
     return goal_pos_w
 
+def generated_spring_coeff(env: ManagerBasedRLEnv, low: float = 1e-3, high: float = 1e-2) -> torch.Tensor:
+    """Generated spring coefficient"""
+    # extract the used quantities (to enable type-hinting)
+    spring_coeff = (high - low) * torch.rand(env.num_envs, 1, dtype=torch.float32) + low
+    assert spring_coeff.shape == (env.num_envs, 1), f"Spring coefficient shape mismatch, expected (num_envs, 1), got {spring_coeff.shape}"
+    return spring_coeff
+
 def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Morphology vector"""
     # extract the used quantities (to enable type-hinting)
     global MORPH_VECTOR
+    global SPRING_COEFF
+    global BUOY_MASSES
+    if BUOY_MASSES is None:
+        # Try to use buoyancy masses already computed on the environment. If they
+        # do not exist yet (during manager/observation initialization), compute
+        # them here and store back on the environment.
+        balloon_masses = getattr(env, "balloon_buoyancy_mass_t", None)
+        if balloon_masses is None:
+            robot: Articulation = env.scene[asset_cfg.name]
+            robot_total_mass = robot.data.default_mass.sum(dim=1)
+            # Prefer a GCR range if provided, otherwise fall back to a fixed GCR.
+            gcr_range = getattr(env, "GCR_range", None)
+            if gcr_range is not None:
+                gcr_tensor = (
+                    torch.rand(env.scene.num_envs, 1, device=env.device)
+                    * (gcr_range[1] - gcr_range[0])
+                    + gcr_range[0]
+                )
+                balloon_masses = gcr_tensor * robot_total_mass.mean().item()
+            else:
+                gcr = getattr(env, "GCR", 0.84)
+                balloon_mass = gcr * robot_total_mass.mean().item()
+                balloon_masses = torch.full(
+                    (env.scene.num_envs, 1),
+                    balloon_mass,
+                    device=env.device,
+                    dtype=robot_total_mass.dtype,
+                )
+            # Cache on env so subsequent physics code can use the same values.
+            env.balloon_buoyancy_mass_t = balloon_masses
+        BUOY_MASSES = env.balloon_buoyancy_mass_t.clone().to('cpu')
+        print(f"[DEBUG] Balloon buoyancy masses: {BUOY_MASSES}")
+
+    if SPRING_COEFF is None:
+        SPRING_COEFF = generated_spring_coeff(env)
+        print(f"[DEBUG] Spring coefficient: {SPRING_COEFF}")
+        robot: Articulation = env.scene[asset_cfg.name]
+        # `robot.actuators["knee_effort_actuators"]` is a SpringPDActuator instance,
+        # so we assign to its attribute directly instead of treating it like a dict.
+        knee_actuators = robot.actuators["knee_effort_actuators"]
+        knee_actuators.spring_coeff = SPRING_COEFF.clone().to(env.device)
+
     if MORPH_VECTOR is None:
         all_dims = get_robot_dimensions(env_indices=slice(0, env.num_envs))
         morphology_vector = torch.cat([
@@ -95,10 +146,12 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
             all_dims.femur_right.height.unsqueeze(-1),
             all_dims.tibia_left.height.unsqueeze(-1),
             all_dims.tibia_right.height.unsqueeze(-1),
-            all_dims.electronics_left.box.size[:, 1].unsqueeze(-1),
-            all_dims.electronics_right.box.size[:, 1].unsqueeze(-1),
+            all_dims.electronics_left.cylinder.height.unsqueeze(-1),
+            all_dims.electronics_right.cylinder.height.unsqueeze(-1),
             all_dims.electronics_left.sphere.radius.unsqueeze(-1),
-            all_dims.electronics_right.sphere.radius.unsqueeze(-1)
+            all_dims.electronics_right.sphere.radius.unsqueeze(-1),
+            SPRING_COEFF,
+            BUOY_MASSES
         ], dim=-1).to(env.device)
         MORPH_VECTOR = morphology_vector
     # print(f"Morphology vector shape: {MORPH_VECTOR.shape}")

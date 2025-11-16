@@ -31,10 +31,12 @@ parser.add_argument("--common_folder", type=str, default=None,
                    help="Common folder name for all seeded runs (overrides timestamp-based folders)")
 parser.add_argument("--world", action="store_true", default=False, 
                    help="Use world frame for velocity tracking reward")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+parser.add_argument("--GCR", type=float, default=0.84, 
                    help="Gravity compensation ratio")
-parser.add_argument("--fl_ratio", type=float, default=0.5, 
-                   help="Ratio of femur length to total leg length")
+parser.add_argument("--GCR_range", type=float, nargs=2, default=None, 
+                   help="Range of gravity compensation ratio (min max)")
+# parser.add_argument("--fl_ratio", type=float, default=0.5, 
+#                    help="Ratio of femur length to total leg length")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -143,7 +145,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
-                   gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
+                   GCR=args_cli.GCR, GCR_range=args_cli.GCR_range)
 
     # Shift the env origins to difficulty level 20
     # isaac_env = env.unwrapped

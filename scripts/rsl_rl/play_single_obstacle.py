@@ -21,7 +21,7 @@ parser.add_argument(
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, 
+parser.add_argument("--GCR", type=float, default=0.84, 
                    help="Gravity compensation ratio")
 parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 
@@ -120,7 +120,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
-                   gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
+                   GCR=args_cli.GCR)
     
     # Shifting the env origins as per the difficulty level
     isaac_env = env.unwrapped

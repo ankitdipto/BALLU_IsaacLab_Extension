@@ -3,6 +3,7 @@ from isaaclab.actuators import ImplicitActuatorCfg, SpringPDActuatorCfg
 from isaaclab.assets import ArticulationCfg
 import math
 import os
+import torch
 ##
 # Configuration
 ##
@@ -53,7 +54,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 0.9), 
+        pos=(0.0, 0.0, 1.0), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
@@ -77,7 +78,7 @@ BALLU_REAL_CFG = ArticulationCfg(
             joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
             effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
             velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
-            spring_coeff=0.00507, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_coeff=0.00807, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
             spring_damping=1.0e-3,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
             pd_p=0.20, #1.00, #0.9, #1.0,
@@ -99,16 +100,89 @@ BALLU_REAL_HETERO_CFG = ArticulationCfg(
     spawn=sim_utils.MultiUsdFileCfg(
         usd_path=[
             os.path.join(
-                root_usd_path, 
-                "morphologies", 
-                "trial30_FLr0.578_knKd0.103_spD0.035_GCR0.891", 
-                "trial30_FLr0.578_knKd0.103_spD0.035_GCR0.891.usd"
+                root_usd_path,
+                "morphologies",
+                "11.18.2025",
+                "auto_asset_FL_0.20",
+                "auto_asset_FL_0.20.usd",
             ),
             os.path.join(
-                root_usd_path, 
-                "morphologies", 
-                "trial36_FLr0.641_knKd0.062_spD0.023_GCR0.891",
-                "trial36_FLr0.641_knKd0.062_spD0.023_GCR0.891.usd"
+                root_usd_path,
+                "morphologies",
+                "11.18.2025",
+                "auto_asset_FL_0.80",
+                "auto_asset_FL_0.80.usd",
+            ),
+            # 11.11.2025 morphology trials - mixed GCR, SPC, FL, TL
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial01_fl0.328_tl0.320_spc0.009_gcr0.757",
+                "trial01_fl0.328_tl0.320_spc0.009_gcr0.757.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial08_fl0.312_tl0.423_spc0.008_gcr0.866",
+                "trial08_fl0.312_tl0.423_spc0.008_gcr0.866.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial20_fl0.461_tl0.333_spc0.002_gcr0.852",
+                "trial20_fl0.461_tl0.333_spc0.002_gcr0.852.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial24_fl0.456_tl0.399_spc0.004_gcr0.844",
+                "trial24_fl0.456_tl0.399_spc0.004_gcr0.844.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial30_fl0.372_tl0.378_spc0.007_gcr0.835",
+                "trial30_fl0.372_tl0.378_spc0.007_gcr0.835.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial40_fl0.385_tl0.353_spc0.002_gcr0.863",
+                "trial40_fl0.385_tl0.353_spc0.002_gcr0.863.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial52_fl0.323_tl0.389_spc0.003_gcr0.818",
+                "trial52_fl0.323_tl0.389_spc0.003_gcr0.818.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial60_fl0.469_tl0.402_spc0.001_gcr0.858",
+                "trial60_fl0.469_tl0.402_spc0.001_gcr0.858.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial69_fl0.362_tl0.312_spc0.003_gcr0.850",
+                "trial69_fl0.362_tl0.312_spc0.003_gcr0.850.usd",
+            ),
+            os.path.join(
+                root_usd_path,
+                "morphologies",
+                "11.11.2025",
+                "trial99_fl0.417_tl0.410_spc0.006_gcr0.848",
+                "trial99_fl0.417_tl0.410_spc0.006_gcr0.848.usd",
             ),
         ],
         random_choice=True,
@@ -130,7 +204,7 @@ BALLU_REAL_HETERO_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.1), 
+        pos=(0.0, 0.0, 0.9), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
