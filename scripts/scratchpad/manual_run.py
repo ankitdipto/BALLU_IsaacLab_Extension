@@ -26,7 +26,7 @@ from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser(description="Tutorial on running the cartpole RL environment.")
 parser.add_argument("--num_envs", type=int, default=1, help="Number of environments to spawn.")
 parser.add_argument("--buoyancy_offset", type=float, nargs=3, help="Buoyancy offset.")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.84, help="Gravity compensation ratio.")
+parser.add_argument("--GCR", type=float, default=0.84, help="Gravity compensation ratio.")
 
 # append AppLauncher cli args
 AppLauncher.add_app_launcher_args(parser)
@@ -112,7 +112,7 @@ def main():
     #buoyancy_offset = [float(x) for x in args_cli.buoyancy_offset]
     print("buoyancy_offset: ", args_cli.buoyancy_offset)
     # setup RL environment
-    env = ManagerBasedRLEnv(cfg=env_cfg, gravity_compensation_ratio=args_cli.gravity_compensation_ratio) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
+    env = ManagerBasedRLEnv(cfg=env_cfg, GCR=args_cli.GCR) #render_mode="rgb_array", buoyancy_offset=args_cli.buoyancy_offset)
     # print environment information
     print(f"\n=== ENVIRONMENT INFO ===")
     print(f"Observation space: {env.unwrapped.observation_space}")
@@ -161,15 +161,15 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            #actions = stepper(count, period = 80, num_envs=args_cli.num_envs)
+            actions = stepper(count, period = 80, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
             #actions = both_legs_0(num_envs=args_cli.num_envs)
             # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
-            if count % env.max_episode_length <= 150:
-                actions = both_legs_0(num_envs=args_cli.num_envs)
-            else:
-                actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
+            # if count % env.max_episode_length <= 150:
+            #     actions = both_legs_theta(theta=5, num_envs=args_cli.num_envs)
+            # else:
+            #     actions = both_legs_theta(theta=0.0, num_envs=args_cli.num_envs)
             # ---- Best action sequence for jumping ----
             # if count % env.max_episode_length <= 80:
             #     actions = both_legs_theta(theta=1.0, num_envs=args_cli.num_envs)

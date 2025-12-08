@@ -130,7 +130,11 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         print(f"[DEBUG] Balloon buoyancy masses: {BUOY_MASSES}")
 
     if SPRING_COEFF is None:
-        SPRING_COEFF = generated_spring_coeff(env)
+        if env.spcf_range is not None:
+            SPRING_COEFF = generated_spring_coeff(env, low=env.spcf_range[0], high=env.spcf_range[1])
+        else:
+            SPRING_COEFF = torch.full((env.num_envs, 1), env.spcf, dtype=torch.float32)
+        assert SPRING_COEFF.shape == (env.num_envs, 1), f"Spring coefficient shape mismatch, expected (num_envs, 1), got {SPRING_COEFF.shape}"
         print(f"[DEBUG] Spring coefficient: {SPRING_COEFF}")
         robot: Articulation = env.scene[asset_cfg.name]
         # `robot.actuators["knee_effort_actuators"]` is a SpringPDActuator instance,

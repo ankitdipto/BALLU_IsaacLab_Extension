@@ -125,9 +125,9 @@ def periodic_reference_traj(env: ManagerBasedRLEnv, period: int, asset_cfg: Scen
                     dims.electronics_left.sphere.radius.to(env.device)
     # Step function: oscillates between 0.50 and 1.0
     # First half of period: 1.0, second half: 0.50
-    reference_traj = torch.where((curr_env_step % period) < (period // 2), 
-                                 torch.tensor(NOMINIAL_Z_POS - 0.25, device=env.device, dtype=torch.float32),
-                                 torch.tensor(NOMINIAL_Z_POS + 0.25, device=env.device, dtype=torch.float32))
+    reference_traj = torch.where((curr_env_step % period) < (period // 2), NOMINIAL_Z_POS - 0.25, NOMINIAL_Z_POS + 0.25) 
+                                # torch.tensor(NOMINIAL_Z_POS - 0.25, device=env.device, dtype=torch.float32),
+                                # torch.tensor(NOMINIAL_Z_POS + 0.25, device=env.device, dtype=torch.float32))
 
     error = torch.abs(asset.data.root_pos_w[:, 2] - reference_traj)
     rew = 0.25 - error
@@ -369,3 +369,14 @@ def goal_directed_velocity(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
     reward = torch.nan_to_num(reward, nan=0.0)
     reward = torch.where(reward >= 0.0, reward, torch.exp(reward) - 1)
     return reward
+
+def deviation_from_straight_line(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
+    """Reward deviation from straight line."""
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    y_env_origin = env.scene.env_origins[:, 1]
+    y_robot_pos = asset.data.root_pos_w[:, 1]
+    error = torch.abs(y_robot_pos - y_env_origin)
+    error =torch.clip(error, max=3.0)
+    error = torch.nan_to_num(error, nan=0.0)
+    assert not torch.isnan(error).any()
+    return error

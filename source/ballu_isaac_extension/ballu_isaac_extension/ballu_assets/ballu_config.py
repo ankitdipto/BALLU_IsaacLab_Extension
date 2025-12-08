@@ -4,11 +4,20 @@ from isaaclab.assets import ArticulationCfg
 import math
 import os
 import torch
+
 ##
 # Configuration
 ##
 
 root_usd_path = os.path.dirname(os.path.abspath(__file__)) + "/robots"
+
+# Import dynamic morphology loader
+try:
+    from .morphology_loader import load_default_hetero_config, load_morphology_library
+    DYNAMIC_LOADER_AVAILABLE = True
+except ImportError:
+    DYNAMIC_LOADER_AVAILABLE = False
+    print("[WARNING] Dynamic morphology loader not available. Using static configuration.")
 
 def degree_to_radian(degree):
     return degree * math.pi / 180.0
@@ -68,7 +77,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         # Define actuators for MOTOR joints to accept position commands from action space
         "motor_actuators": ImplicitActuatorCfg(
             joint_names_expr=["MOTOR_LEFT", "MOTOR_RIGHT"],
-            effort_limit_sim=1.44 * 9.81 * 1e-2, # 0.1412 Nm
+            effort_limit_sim=1.44 * 9.81 * 1e-2 * 0.6, # 0.1412 Nm * 0.6 = 0.0847584 Nm
             velocity_limit_sim=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
             stiffness=1.0,
             damping=0.01,
@@ -76,13 +85,13 @@ BALLU_REAL_CFG = ArticulationCfg(
         # Define effort-control actuator for KNEE joints
         "knee_effort_actuators": SpringPDActuatorCfg(
             joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
-            effort_limit=1.44 * 9.81 * 1e-2, # 0.141264 Nm
+            effort_limit=1.44 * 9.81 * 1e-2 * 0.6, # 0.141264 Nm * 0.6 = 0.0847584 Nm
             velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
-            spring_coeff=0.00807, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_coeff=0.0807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
             spring_damping=1.0e-3,
             spring_preload=degree_to_radian(180 - 135 + 27.35),
-            pd_p=0.20, #1.00, #0.9, #1.0,
-            pd_d=0.02, #0.08, #0.02
+            pd_p=1.00, #0.9, #1.0,
+            pd_d=0.08, #0.02
             stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
             damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
         ),
@@ -95,6 +104,68 @@ BALLU_REAL_CFG = ArticulationCfg(
     },
 )
 """Configuration for the real BALLU robot."""
+
+BALLU_WALKER_CFG = ArticulationCfg(
+    spawn=sim_utils.UsdFileCfg(
+        usd_path=get_robot_usd_path(),
+        activate_contact_sensors=True,
+        rigid_props=sim_utils.RigidBodyPropertiesCfg(
+            rigid_body_enabled=True,
+            max_linear_velocity=1000.0,
+            max_angular_velocity=1000.0,
+            max_depenetration_velocity=100.0,
+            enable_gyroscopic_forces=True,
+        ),
+        articulation_props=sim_utils.ArticulationRootPropertiesCfg(
+            enabled_self_collisions=False,
+            solver_position_iteration_count=4,
+            solver_velocity_iteration_count=0,
+            sleep_threshold=0.005,
+            stabilization_threshold=0.001,
+            fix_root_link=False
+        ),
+    ),
+    init_state=ArticulationCfg.InitialStateCfg(
+        pos=(0.0, 0.0, 1.4), 
+        # rot=(0.9238795, 0.0, 0.0, 0.3826834),
+        joint_pos={"NECK": 0.0, 
+                   "HIP_LEFT": degree_to_radian(1),
+                   "HIP_RIGHT": degree_to_radian(1),
+                   "KNEE_LEFT": degree_to_radian(27.35),
+                   "KNEE_RIGHT": degree_to_radian(27.35),
+                   "MOTOR_LEFT": degree_to_radian(10),
+                   "MOTOR_RIGHT": degree_to_radian(10)}
+    ),
+    actuators={
+        # Define actuators for MOTOR joints to accept position commands from action space
+        "motor_actuators": ImplicitActuatorCfg(
+            joint_names_expr=["MOTOR_LEFT", "MOTOR_RIGHT"],
+            effort_limit_sim=1.44 * 9.81 * 1e-2 * 0.6, # 0.1412 Nm * 0.6 = 0.0847584 Nm
+            velocity_limit_sim=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
+            stiffness=1.0,
+            damping=0.01,
+        ),
+        # Define effort-control actuator for KNEE joints
+        "knee_effort_actuators": SpringPDActuatorCfg(
+            joint_names_expr=["KNEE_LEFT", "KNEE_RIGHT"],
+            effort_limit=1.44 * 9.81 * 1e-2 * 0.6, # 0.1412 Nm * 0.6 = 0.0847584 Nm
+            velocity_limit=degree_to_radian(60) / 0.14, # 60 deg/0.14 sec = 428.57 rad/s
+            spring_coeff=0.00507, #0.0807, #0.00807, #0.1409e-3 / degree_to_radian(1.0), # 0.00807 Nm/rad
+            spring_damping=1.0e-3,
+            spring_preload=degree_to_radian(180 - 135 + 27.35),
+            pd_p=0.09, #1.00, #0.9, #1.0,
+            pd_d=0.02, #0.08, #0.02
+            stiffness=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
+            damping=float("inf"), # Should not be used (If used, then I will understand by simulation instability)
+        ),
+        # Keep other joints passive
+        "other_passive_joints": ImplicitActuatorCfg(
+            joint_names_expr=["NECK", "HIP_LEFT", "HIP_RIGHT"], 
+            stiffness=0.0,
+            damping=0.001,
+        ),
+    },
+)
 
 BALLU_REAL_HETERO_CFG = ArticulationCfg(
     spawn=sim_utils.MultiUsdFileCfg(
@@ -478,3 +549,63 @@ BALLU_REAL_HETERO_CFG = ArticulationCfg(
 #     },
 # )
 """Configuration for a BALLU robot with actuated hips and knees."""
+
+
+def get_ballu_hetero_cfg_dynamic(
+    library_name: str = "hetero_library",
+    max_morphologies: int = None,
+    spring_coeff: float = 0.0807,
+    spring_damping: float = 1.0e-2,
+    pd_p: float = 1.0,
+    pd_d: float = 0.08,
+    **kwargs
+) -> ArticulationCfg:
+    """
+    Get heterogeneous BALLU configuration by dynamically loading morphologies from a library.
+    
+    This function replaces the hardcoded BALLU_REAL_HETERO_CFG with a dynamic version
+    that can load 100+ morphologies from a directory.
+    
+    Args:
+        library_name: Name of the morphology library directory
+        max_morphologies: Maximum number of morphologies to load (None = all)
+        spring_coeff: Spring coefficient for knee actuators
+        spring_damping: Spring damping for knee actuators
+        pd_p: PD controller proportional gain
+        pd_d: PD controller derivative gain
+        **kwargs: Additional arguments passed to create_hetero_config
+        
+    Returns:
+        ArticulationCfg configured for heterogeneous training
+        
+    Example:
+        # Load all morphologies from default library
+        cfg = get_ballu_hetero_cfg_dynamic()
+        
+        # Load first 50 morphologies
+        cfg = get_ballu_hetero_cfg_dynamic(max_morphologies=50)
+        
+        # Load from custom library
+        cfg = get_ballu_hetero_cfg_dynamic(library_name="my_custom_library")
+    """
+    if not DYNAMIC_LOADER_AVAILABLE:
+        raise ImportError(
+            "Dynamic morphology loader not available. "
+            "Ensure morphology_loader.py is in the same directory."
+        )
+    
+    return load_default_hetero_config(
+        library_name=library_name,
+        max_morphologies=max_morphologies,
+        spring_coeff=spring_coeff,
+        spring_damping=spring_damping,
+        pd_p=pd_p,
+        pd_d=pd_d,
+        **kwargs
+    )
+
+
+# Convenience function to check if dynamic loading is available
+def has_dynamic_morphology_support() -> bool:
+    """Check if dynamic morphology loading is available."""
+    return DYNAMIC_LOADER_AVAILABLE

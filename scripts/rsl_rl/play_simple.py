@@ -20,8 +20,8 @@ parser.add_argument(
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
 parser.add_argument("--task", type=str, default=None, help="Name of the task.")
-parser.add_argument("--gravity_compensation_ratio", type=float, default=0.80, 
-                   help="Gravity compensation ratio")
+parser.add_argument("--GCR", type=float, default=0.84, help="Gravity compensation ratio")
+parser.add_argument("--spcf", type=float, default=0.005, help="Spring coefficient")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -90,7 +90,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
-                   gravity_compensation_ratio=args_cli.gravity_compensation_ratio)
+                   GCR=args_cli.GCR, spcf=args_cli.spcf)
     
     if args_cli.video:
         video_kwargs = {
@@ -145,6 +145,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         print(f"[INFO] Exception received: {e}")
     finally:
         # close the simulator
+        spring_coeff = env.unwrapped.scene["robot"].actuators["knee_effort_actuators"].spring_coeff[0][0].item()
+        GCR_value = env.unwrapped.GCR
+        print(f"[INFO] Spring coefficient: {spring_coeff}")
+        print(f"[INFO] Gravity compensation ratio: {GCR_value}")
         env.close()
 
     # print cumulative rewards
@@ -153,6 +157,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print(f"[INFO] Mean cumulative reward: {cumulative_rewards.mean().item():.4f}")
     if env.num_envs > 1:
         print(f"[INFO] Std cumulative reward: {cumulative_rewards.std().item():.4f}")
+
+    
 
 if __name__ == "__main__":
     # run the main function

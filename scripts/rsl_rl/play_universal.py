@@ -19,12 +19,13 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default=None, help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isc-BALLU-hetero-pretrain", help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
 parser.add_argument("--GCR", type=float, default=0.84, 
                    help="Gravity compensation ratio")
-parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 parser.add_argument("--spcf", type=float, default=None, help="Spring Coefficient")
+parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
+parser.add_argument("--cmdir", type=str, required=True, help="Name of the common directory.")
 
 # append RSL-RL cli arguments
 cli_args.add_rsl_rl_args(parser)
@@ -81,19 +82,10 @@ from evals.evaluate_obstacle_stepping_task import threshold_based_verification
 
 # Import extensions to set up environment tasks
 import ballu_isaac_extension.tasks  # noqa: F401
+from ballu_isaac_extension.tasks.ballu_locomotion.mdp.geometry_utils import get_femur_dimensions, get_tibia_dimensions, get_pelvis_dimensions
+
 import isaaclab.utils.math as math_utils
 from tqdm import tqdm
-
-def stepper(step_count, period=200, num_envs=1):
-    """
-    Stepper controller for joint actuation.
-    """
-    actions = torch.full((num_envs, 2), 0.0, device="cuda:0")
-    if step_count % period < period / 2:
-        actions[:, 0] = 1.0
-    else:
-        actions[:, 1] = 1.0
-    return actions
 
 @hydra_task_config(args_cli.task, "rsl_rl_cfg_entry_point")
 def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agent_cfg: RslRlOnPolicyRunnerCfg):
@@ -102,26 +94,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     agent_cfg = cli_args.update_rsl_rl_cfg(agent_cfg, args_cli)
     env_cfg.scene.num_envs = args_cli.num_envs if args_cli.num_envs is not None else env_cfg.scene.num_envs
     env_cfg.sim.device = args_cli.device if args_cli.device is not None else env_cfg.sim.device
-    
-    if args_cli.spcf is not None:
-        env_cfg.scene.robot.actuators["knee_effort_actuators"].spring_coeff = args_cli.spcf
-        print(f"[INFO] Overriding spring coefficient to: {args_cli.spcf}")
 
     # specify directory for logging experiments
     log_root_path = os.path.join("logs", "rsl_rl", agent_cfg.experiment_name)
     log_root_path = os.path.abspath(log_root_path)
     print(f"[INFO] Loading experiment from directory: {log_root_path}")
     checkpoint_path = os.path.join(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
-    log_dir = os.path.join(log_root_path, agent_cfg.load_run)
+    log_dir = os.path.join(log_root_path, agent_cfg.load_run, args_cli.cmdir)
     print(f"[INFO] checkpoint_path: {checkpoint_path}")
     print(f"[INFO] log_dir: {log_dir}")
 
-    timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
-
-    # create debug directory for this run
-    play_folder = os.path.join(log_dir, "play", timestamp, f"{agent_cfg.load_checkpoint[:-3]}_Ht{args_cli.difficulty_level}")
-    os.makedirs(play_folder, exist_ok=True)
-    print(f"[INFO] Saving plots to: {play_folder}")
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
@@ -140,6 +122,17 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     isaac_env.scene._default_env_origins = isaac_env.scene._default_env_origins + \
         torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * args_cli.difficulty_level
 
+    spcf = isaac_env.scene["robot"].actuators["knee_effort_actuators"].spring_coeff[0][0].item()
+    GCR = isaac_env.GCR
+    timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
+    FL = get_femur_dimensions(0, side="RIGHT").height.item()
+    TL = get_tibia_dimensions(0, side="RIGHT").height.item()
+    HL = get_pelvis_dimensions(0).height.item()
+    # create debug directory for this run
+    eval_folder = os.path.join(log_dir, f"{timestamp}_fl{FL:.3f}_tl{TL:.3f}_hl{HL:.3f}_gcr{GCR:.3f}_spcf{spcf:.4f}_Ht{args_cli.difficulty_level}")
+    os.makedirs(eval_folder, exist_ok=True)
+    print(f"[INFO] Saving plots to: {eval_folder}")
+
     EYE = (
         1.0 - 5.5/1.414, 
         5.5/1.414 + inter_obstacle_spacing_y * args_cli.difficulty_level, 
@@ -157,7 +150,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     if args_cli.video:
         video_kwargs = {
             "name_prefix": 'ballu',  
-            "video_folder": play_folder,
+            "video_folder": eval_folder,
             "step_trigger": lambda step: step == 0,
             "video_length": args_cli.video_length,
             "disable_logger": True,
@@ -323,13 +316,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             pbar.update(1)
 
     # Before closing the simulator evaluate the performance
-    successes, local_positions = threshold_based_verification(env.unwrapped, threshold_x = 1.0)
+    successes, local_positions = threshold_based_verification(env.unwrapped, threshold_x = 0.6)
     success_rate = successes.float().mean().item()
-    
-    # Capture values we need BEFORE closing the environment (close() deletes scene and other attributes)
-    spring_coeff = isaac_env.scene["robot"].actuators["knee_effort_actuators"].spring_coeff
-    GCR_value = isaac_env.GCR
-    
     # close the simulator (Very very important)
     env.close()
 
@@ -348,13 +336,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     #if len(toe_endpoints_world_history) > 0:
 
     # Generate plots
-    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
-    plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, play_folder)
+    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
+    plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, eval_folder)
     # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
-    plot_base_velocity(base_vel_hist_tch, env.num_envs, play_folder)
-    # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, play_folder)
-    plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, play_folder)
-    plot_local_positions_scatter(local_positions, play_folder, threshold_x=1.0, success_rate=success_rate)
+    plot_base_velocity(base_vel_hist_tch, env.num_envs, eval_folder)
+    # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
+    plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, eval_folder)
+    plot_local_positions_scatter(local_positions, eval_folder, threshold_x=1.0, success_rate=success_rate)
     print("Plotting complete.")
     # Save data to CSV file for env_idx=0
     env_idx = 0
@@ -401,7 +389,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     }
     
     df = pd.DataFrame(csv_data)
-    csv_path = os.path.join(play_folder, "results.csv")
+    csv_path = os.path.join(eval_folder, "results.csv")
     df.to_csv(csv_path, index=False)
     print(f"[INFO] Saved data to CSV file: {csv_path}")
     
@@ -410,9 +398,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print("base_vel_mean of RL policy: ", base_vel_mean)
     print("base_vel_std of RL policy: ", base_vel_std)
     print("cumulative rewards of RL policy: ", cum_rewards)
-    print(f"GCR: {GCR_value}")
-    print(f"spring coefficient: {spring_coeff}")
     print("success rate of RL policy: ", success_rate)
+    print(f"SUCCESS_RATE: {success_rate:.6f}")  # Parseable format for automated scripts
 
 if __name__ == "__main__":
     # run the main function

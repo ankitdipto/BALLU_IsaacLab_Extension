@@ -1,3 +1,55 @@
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0002/hetero_0002.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0002"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0003/hetero_0003.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0003"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0004/hetero_0004.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0004"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0005/hetero_0005.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0005"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0006/hetero_0006.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0006"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0007/hetero_0007.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0007"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0008/hetero_0008.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0008"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0009/hetero_0009.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0009"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0010/hetero_0010.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0010"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0011/hetero_0011.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0011"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0012/hetero_0012.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0012"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0013/hetero_0013.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0013"
+
+env BALLU_USD_REL_PATH="morphologies/hetero_library_20251115_215756/hetero_0014/hetero_0014.usd" \
+    python scripts/rsl_rl/train.py --task Isc-BALLU-hetero-general --num_envs 4096 --headless --GCR 0.75 --spcf 0.005 \
+    --max_iterations 1600 --run_name "hetero_0014"
+
 # Exp 0-2: BALLU Real privileged in World Frame
 # python scripts/rsl_rl/train.py --task Isaac-Vel-BALLU-real-priv --num_envs 4096 \
 #                             --run_name "real_priv_motor-eff=1_seed_0" \

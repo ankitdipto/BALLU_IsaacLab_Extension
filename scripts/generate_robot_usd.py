@@ -20,27 +20,28 @@ except Exception as exc:
     print(f"[HINT] Ensure PYTHONPATH includes: {ext_dir}")
     sys.exit(1)
 
-def generate_robot_usd(femur_to_limb_ratio: float, total_leg_length: float = 0.75, name: str = "auto_asset_FL") -> str:
+def generate_robot_usd(femur_length: float, tibia_length: float, name: str = "auto_asset") -> str:
     """
-    Generate a robot USD file with specified femur-to-limb ratio.
+    Generate a robot USD file with specified femur and tibia lengths.
     
     Args:
-        femur_to_limb_ratio: Ratio of femur length to total leg length (0-1)
-        total_leg_length: Total leg length in meters
+        femur_length: Femur length in meters
+        tibia_length: Tibia length in meters
+        name: Name of the robot
     
     Returns:
         str: USD filename (without path) or empty string if failed
     """
     # Generate unique morphology ID
     timestamp = datetime.now().strftime("%b_%d_%H_%M_%S")
-    morph_id = f"{name}_{femur_to_limb_ratio:.2f}"
+    morph_id = f"{name}_fl{femur_length:.2f}_tl{tibia_length:.2f}"
     
     try:
         # Create morphology variant using the direct parameter
         morph = create_morphology_variant(
             morphology_id=morph_id,
-            femur_to_limb_ratio=femur_to_limb_ratio,
-            total_leg_length=total_leg_length
+            femur_length=femur_length,
+            tibia_length=tibia_length,
         )
         
         # Validate morphology
@@ -69,24 +70,18 @@ def generate_robot_usd(femur_to_limb_ratio: float, total_leg_length: float = 0.7
 
 def main():
     parser = argparse.ArgumentParser(description='Generate BALLU robot USD with specified femur-to-limb ratio')
-    parser.add_argument('--ratio', type=float, required=True,
-                      help='Femur-to-total-leg-length ratio (0-1)')
-    parser.add_argument('--total-leg-length', type=float, default=0.75,
-                      help='Total leg length in meters (default: 0.75)')
-    parser.add_argument('--name', type=str, default="auto_asset_FL",
+    parser.add_argument('--femur_length', type=float, required=True,
+                      help='Femur length in meters')
+    parser.add_argument("--tibia_length", type=float, required=True,
+                      help='Tibia length in meters')
+    parser.add_argument('--name', type=str, default="auto_asset",
                       help='Name of the robot')
-    
     args = parser.parse_args()
-    
-    # Validate ratio
-    if args.ratio <= 0 or args.ratio >= 1:
-        print(f"Error: Ratio must be between 0 and 1. Got: {args.ratio}")
-        sys.exit(1)
     
     # Generate the robot USD
     usd_filename = generate_robot_usd(
-        femur_to_limb_ratio=args.ratio,
-        total_leg_length=args.total_leg_length,
+        femur_length=args.femur_length,
+        tibia_length=args.tibia_length,
         name=args.name
     )
     

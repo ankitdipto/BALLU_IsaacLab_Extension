@@ -25,7 +25,7 @@ import ballu_isaac_extension.tasks.ballu_locomotion.mdp as mdp
 # Pre-defined configs
 ##
 
-from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_REAL_CFG
+from ballu_isaac_extension.ballu_assets.ballu_config import BALLU_WALKER_CFG
 
 ##
 # Scene definition
@@ -52,7 +52,7 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     )
 
     # BALLU
-    robot: ArticulationCfg = BALLU_REAL_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
+    robot: ArticulationCfg = BALLU_WALKER_CFG.replace(prim_path="{ENV_REGEX_NS}/Robot")
 
     # lights
     dome_light = AssetBaseCfg(
@@ -61,9 +61,9 @@ class BALLUSceneCfg(InteractiveSceneCfg):
     )
 
     # contact sensors at feet
-    #contact_forces = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/TIBIA_(LEFT|RIGHT)", 
-    #                                  history_length=3, 
-    #                                  track_air_time=True)
+    contact_forces_tibia = ContactSensorCfg(prim_path="{ENV_REGEX_NS}/Robot/ELECTRONICS_(LEFT|RIGHT)", 
+                                     history_length=3, 
+                                     track_air_time=True)
     
     # IMU sensors at the feet
     # imu_electronics_left = ImuCfg(
@@ -149,7 +149,7 @@ class ObservationsCfg:
         #velocity_commands = ObsTerm(func=mdp.generated_commands, params={"command_name": "base_velocity"})
         joint_pos = ObsTerm(func=mdp.joint_pos)
         joint_vel = ObsTerm(func=mdp.joint_vel)
-
+        base_pos = ObsTerm(func=mdp.root_pos_w)
         base_lin_vel = ObsTerm(func=mdp.base_lin_vel)
         #base_ang_vel = ObsTerm(func=mdp.base_ang_vel)
         #actions = ObsTerm(func=mdp.last_action)
@@ -168,6 +168,12 @@ class ObservationsCfg:
 
         # Phase of periodic reference trajectory
         phase_of_periodic_reference_traj = ObsTerm(func=mdp.phase_of_periodic_reference_traj, params={"period": 40})
+
+        # Previous action
+        last_action = ObsTerm(func=mdp.last_action)
+
+        # Morphology vector - key for universal controller
+        morphology_vector = ObsTerm(func=mdp.morphology_vector_priv)
 
         # IMU sensor readings on tibias
         #left_tibia_orientation = ObsTerm(func=mdp.imu_orientation, params={"asset_cfg": SceneEntityCfg("imu_tibia_left")})
@@ -215,11 +221,17 @@ class RewardsCfg:
     # Reward to encourage progress towards goal
     navigation_reward_l2 = RewTerm(
         func=mdp.navigation_reward_l2,
-        weight=5.0,
+        weight=1.0,
         params={
-            "begin_iter": 300,
-            "ramp_width": 400
+            "begin_iter": 200,
+            "ramp_width": 300
         }
+    )
+
+    # Reward to encourage deviation from straight line
+    deviation_from_straight_line = RewTerm(
+        func=mdp.deviation_from_straight_line,
+        weight=-1.0,
     )
 
     # Reward to encourage goal directed velocity

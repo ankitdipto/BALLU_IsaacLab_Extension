@@ -35,6 +35,10 @@ parser.add_argument("--GCR", type=float, default=0.84,
                    help="Gravity compensation ratio")
 parser.add_argument("--GCR_range", type=float, nargs=2, default=None, 
                    help="Range of gravity compensation ratio (min max)")
+parser.add_argument("--spcf", type=float, default=0.005, 
+                   help="Spring coefficient")
+parser.add_argument("--spcf_range", type=float, nargs=2, default=None, 
+                   help="Range of spring coefficient (min max)")
 # parser.add_argument("--fl_ratio", type=float, default=0.5, 
 #                    help="Ratio of femur length to total leg length")
 
@@ -145,7 +149,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
-                   GCR=args_cli.GCR, GCR_range=args_cli.GCR_range)
+                   GCR=args_cli.GCR, GCR_range=args_cli.GCR_range, spcf=args_cli.spcf, spcf_range=args_cli.spcf_range)
 
     # Shift the env origins to difficulty level 20
     # isaac_env = env.unwrapped

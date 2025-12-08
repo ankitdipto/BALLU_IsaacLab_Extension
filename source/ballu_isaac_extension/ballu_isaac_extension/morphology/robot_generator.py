@@ -283,6 +283,11 @@ class BalluRobotGenerator:
             length=g.balloon_height,
             com_y=-0.38  # Positioned below pelvis
         )
+
+        # This is a hack to make the balloon more stable
+        # self.balloon_inertia.iyy *= 9.0
+        # self.balloon_inertia.izz *= 4.0
+        # self.balloon_inertia.ixx *= 4.0
         
         # Motorarm: small box
         self.motorarm_inertia = calc.box(
