@@ -37,7 +37,7 @@ def get_robot_usd_path():
         default_path = os.path.join(
             root_usd_path, "11.04.2025", 
             "trial64_fl0.305_tl0.422_spc0.002_gcr0.859", 
-            "trial64_fl0.305_tl0.422_spc0.002_gcr0.859.usd"
+            "trial64_fl0.305_tl0.422_spc0.002_gcr0.85"
         )
         print(f"🤖 Using default robot USD: {default_path}")
         return default_path
@@ -63,7 +63,7 @@ BALLU_REAL_CFG = ArticulationCfg(
         ),
     ),
     init_state=ArticulationCfg.InitialStateCfg(
-        pos=(0.0, 0.0, 1.0), 
+        pos=(0.0, 0.0, 1.2), 
         # rot=(0.9238795, 0.0, 0.0, 0.3826834),
         joint_pos={"NECK": 0.0, 
                    "HIP_LEFT": degree_to_radian(1),
