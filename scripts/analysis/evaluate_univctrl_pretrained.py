@@ -13,8 +13,9 @@ from typing import List, Tuple, Optional
 import random
 
 # --- Path Setup ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)
+# script_dir = os.path.dirname(os.path.abspath(__file__))
+# project_dir = os.path.dirname(script_dir)
+project_dir = os.getcwd()
 
 
 def run_play_universal(
