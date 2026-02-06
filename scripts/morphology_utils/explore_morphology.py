@@ -11,8 +11,10 @@ from optuna.trial import TrialState
 import torch
 
 # --- Path Setup ---
-script_dir = os.path.dirname(os.path.abspath(__file__))
-project_dir = os.path.dirname(script_dir)
+#script_dir = os.path.dirname(os.path.abspath(__file__))
+#project_dir = os.path.dirname(script_dir)
+project_dir = os.getcwd()
+print(f"Project directory: {project_dir}")
 ext_dir = os.path.join(project_dir, "source", "ballu_isaac_extension", "ballu_isaac_extension")
 if ext_dir not in sys.path:
     sys.path.insert(0, ext_dir)
@@ -44,12 +46,12 @@ def run_training_experiment(
         "--run_name", morph_id,
         "--headless",
         "--seed", str(seed),
-        "--gravity_compensation_ratio", str(gravity_comp_ratio),
-        f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coeff:.6f}"
+        "--GCR", str(gravity_comp_ratio),
+        f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coeff:.6f}",
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/11.18.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/02.03.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -103,12 +105,12 @@ def run_testing_experiment(
         "--device", device,
         "--headless",
         "--difficulty_level", str(difficulty_level),
-        "--gravity_compensation_ratio", str(gravity_comp_ratio),
+        "--GCR", str(gravity_comp_ratio),
         f"env.scene.robot.actuators.knee_effort_actuators.spring_coeff={spring_coeff:.6f}",
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/11.18.2025/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/02.03.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
