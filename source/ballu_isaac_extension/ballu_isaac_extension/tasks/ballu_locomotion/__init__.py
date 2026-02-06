@@ -146,3 +146,24 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerWalkingCfg"
     }
 )
+
+# MoE (Mixture-of-Experts) variant for heterogeneous morphology training
+gym.register(
+    id="Isc-BALLU-hetero-pretrain-moe",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_dynamic_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUMoEPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-general-moe",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_env_cfg:BalluSingleObstacleHeteroEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUMoEPPORunnerCfg"
+    }
+)
