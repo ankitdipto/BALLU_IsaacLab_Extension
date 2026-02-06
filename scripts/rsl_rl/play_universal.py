@@ -19,7 +19,7 @@ parser.add_argument(
     "--disable_fabric", action="store_true", default=False, help="Disable fabric and use USD I/O operations."
 )
 parser.add_argument("--num_envs", type=int, default=None, help="Number of environments to simulate.")
-parser.add_argument("--task", type=str, default="Isc-BALLU-hetero-pretrain", help="Name of the task.")
+parser.add_argument("--task", type=str, default="Isc-BALLU-hetero-general", help="Name of the task.")
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
 parser.add_argument("--GCR", type=float, default=0.84, 
                    help="Gravity compensation ratio")
@@ -53,6 +53,7 @@ import torch
 import pandas as pd
 
 from rsl_rl.runners import OnPolicyRunner
+from rsl_rl.modules import MoEActorCritic
 
 from isaaclab.envs import (
     DirectMARLEnv,
@@ -173,6 +174,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # obtain the trained policy for inference
     policy = ppo_runner.get_inference_policy(device=env.unwrapped.device)
+    
+    # Check if using MoE policy
+    is_moe_policy = isinstance(ppo_runner.alg.policy, MoEActorCritic)
+    if is_moe_policy:
+        print("[INFO] MoE policy detected - will log expert indices")
+        moe_policy = ppo_runner.alg.policy
+        # Initialize expert tracking for the test environments
+        moe_policy.init_expert_tracking(env.num_envs, env.unwrapped.device)
 
     # note: export policy to onnx/jit is disabled as of now
     # export policy to onnx/jit
@@ -199,6 +208,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     comp_torq_history = []
     applied_torq_history = []
     contact_forces_tibia_history = []
+    expert_indices_history = []  # For MoE policy
+    expert_gate_probs_history = []
     #all_rewards = []
 
     # Get robots_data and tibia indices once before simulation loop
@@ -222,6 +233,13 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
             with torch.inference_mode():
                 # agent stepping
                 actions = policy(obs)
+                
+                # Capture expert indices for MoE policy (before env step, after policy forward)
+                if is_moe_policy and timestep == 0:
+                    # Expert indices are selected on first step and remain fixed per episode
+                    expert_indices_history.append(moe_policy.current_expert_indices.clone().detach().cpu())
+                    expert_gate_probs_history.append(moe_policy._last_gate_probs.clone().detach().cpu())
+                
                 # actions = stepper(timestep,
                 #                   period=40,
                 #                   num_envs=env.num_envs)
@@ -393,6 +411,32 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     df.to_csv(csv_path, index=False)
     print(f"[INFO] Saved data to CSV file: {csv_path}")
     
+    # Save MoE expert indices to text file
+    if is_moe_policy and len(expert_indices_history) > 0:
+        expert_indices = expert_indices_history[0]  # Shape: (num_envs,)
+        expert_gate_probs = expert_gate_probs_history[0]  # Shape: (num_envs, num_experts)
+        expert_indices_path = os.path.join(eval_folder, "expert_indices.txt")
+        with open(expert_indices_path, 'w') as f:
+            f.write("# MoE Expert Indices for Test Environments\n")
+            f.write(f"# Number of environments: {len(expert_indices)}\n")
+            f.write(f"# Number of experts: {moe_policy.num_experts}\n")
+            f.write(f"# Gumbel temperature at inference: {moe_policy.tau:.4f}\n")
+            f.write("#\n")
+            f.write("# env_idx, expert_idx\n")
+            for env_idx, exp_idx in enumerate(expert_indices.numpy()):
+                f.write(f"{env_idx}, {exp_idx}\n")
+            f.write("\n# === Expert Gate Probs ===\n")
+            for env_idx, gate_probs in enumerate(expert_gate_probs.numpy()):
+                f.write(f"# Environment {env_idx}: {gate_probs}\n")
+            # Summary statistics
+            f.write("\n# === Summary ===\n")
+            for exp_id in range(moe_policy.num_experts):
+                count = (expert_indices == exp_id).sum().item()
+                pct = 100 * count / len(expert_indices)
+                f.write(f"# Expert {exp_id}: {count} envs ({pct:.1f}%)\n")
+        
+        print(f"[INFO] Saved MoE expert indices to: {expert_indices_path}")
+    
     base_vel_mean = base_vel_hist_tch.mean(dim=0)
     base_vel_std = base_vel_hist_tch.std(dim=0)
     print("base_vel_mean of RL policy: ", base_vel_mean)
@@ -400,6 +444,15 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     print("cumulative rewards of RL policy: ", cum_rewards)
     print("success rate of RL policy: ", success_rate)
     print(f"SUCCESS_RATE: {success_rate:.6f}")  # Parseable format for automated scripts
+    
+    # Print MoE expert utilization summary
+    if is_moe_policy and len(expert_indices_history) > 0:
+        expert_indices = expert_indices_history[0]
+        print("\n=== MoE Expert Utilization ===")
+        for exp_id in range(moe_policy.num_experts):
+            count = (expert_indices == exp_id).sum().item()
+            pct = 100 * count / len(expert_indices)
+            print(f"  Expert {exp_id}: {count} envs ({pct:.1f}%)")
 
 if __name__ == "__main__":
     # run the main function
