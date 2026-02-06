@@ -279,7 +279,7 @@ class BalluSingleObstacleHeteroDynamicEnvCfg(ManagerBasedRLEnvCfg):
                 "Ensure morphology_loader.py is installed."
             )
         
-        self.morphology_library_name = "hetero_library_20251115_215756"
+        self.morphology_library_name = "hetero_library_hvyBloon_lab01.20.26"
         # self.morphology_library_name = "test_library"
         self.max_morphologies = None # None = load all morphologies
         # Load robot configuration dynamically
@@ -291,7 +291,9 @@ class BalluSingleObstacleHeteroDynamicEnvCfg(ManagerBasedRLEnvCfg):
         
         self.scene.robot = get_ballu_hetero_cfg_dynamic(
             library_name=self.morphology_library_name,
-            max_morphologies=self.max_morphologies
+            max_morphologies=self.max_morphologies,
+            spring_damping=0.001,
+            init_pos = (0.0, 0.0, 1.2)
         ).replace(prim_path="{ENV_REGEX_NS}/Robot")
         
         # general settings
