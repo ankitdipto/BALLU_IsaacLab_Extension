@@ -1,12 +1,19 @@
 from isaaclab.utils import configclass
-from isaaclab_rl.rsl_rl import RslRlOnPolicyRunnerCfg, RslRlPpoActorCriticCfg, RslRlPpoAlgorithmCfg, RslRlMirrorSymmetryCfg
+from isaaclab_rl.rsl_rl import (
+    RslRlOnPolicyRunnerCfg, 
+    RslRlPpoActorCriticCfg, 
+    RslRlPpoAlgorithmCfg, 
+    RslRlMirrorSymmetryCfg,
+    RslRlMoEActorCriticCfg,
+    RslRlMoECfg,
+)
 
 @configclass
 class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20 #25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 100
-    experiment_name = "lab_12.10.2025"
+    experiment_name = "lab_02.03.2026"
     empirical_normalization = True  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
@@ -79,7 +86,7 @@ class BALLUPPORunnerWalkingCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20 #25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 50
-    experiment_name = "lab_12.02.2025"
+    experiment_name = "lab_02.03.2026"
     empirical_normalization = True  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
@@ -145,4 +152,70 @@ class BALLUPPORunnerWalkingCfg(RslRlOnPolicyRunnerCfg):
                 (0, 1),  # MOTOR_LEFT <-> MOTOR_RIGHT
             ],
         )
+    )
+
+
+@configclass
+class BALLUMoEPPORunnerCfg(RslRlOnPolicyRunnerCfg):
+    """Configuration for BALLU MoE (Mixture-of-Experts) PPO training.
+    
+    This configuration uses a gated mixture of expert networks, where the gate
+    selects an expert based on the morphology vector. This enables specialized
+    behavior for different robot morphologies while sharing a common training framework.
+    
+    Key features:
+    - Configurable routing: 'soft' (weighted combination) or 'hard' (one-hot selection)
+    - Morphology-conditioned experts (experts see both observations and morphology)
+    - Load balancing loss to prevent expert collapse (especially for hard routing)
+    - Temperature annealing for sharper expert selection over time
+    """
+    
+    num_steps_per_env = 20
+    max_iterations = 2000
+    save_interval = 100
+    experiment_name = "lab_02.03.2026"
+    empirical_normalization = True
+    
+    policy = RslRlMoEActorCriticCfg(
+        init_noise_std=0.5,
+        actor_hidden_dims=[128, 64, 32],
+        critic_hidden_dims=[128, 64, 32],
+        gate_hidden_dims=[64, 32],
+        activation="elu",
+        num_experts=5,
+        num_morphology_obs=11,  # BALLU morphology vector dimension
+        routing_type="hard",    # 'soft' = weighted combination, 'hard' = one-hot selection
+        tau_initial=1.0,        # Initial temperature (higher = softer selection)
+        tau_min=0.1,            # Minimum temperature after annealing
+        tau_anneal_rate=0.0, #0.00060, # Temperature annealing rate per iteration
+        load_balance_coef=0.01,  # Load balancing loss coefficient (important for hard routing)
+        # Expert diversity loss (top-2 cosine repulsion on action means)
+        # Scheduled inside `MoEActorCritic.sample_and_commit_experts(...)` at the start of each PPO iteration.
+        diversity_coef_max=1.0e-3,
+        diversity_start_iter=1200,
+        diversity_ramp_iters=300,
+        diversity_eps=1.0e-8,
+    )
+    
+    algorithm = RslRlPpoAlgorithmCfg(
+        value_loss_coef=1.0,
+        use_clipped_value_loss=True,
+        clip_param=0.2,
+        entropy_coef=0.01,
+        num_learning_epochs=5,
+        num_mini_batches=4,
+        learning_rate=1.0e-4,
+        schedule="adaptive",
+        gamma=0.99,
+        lam=0.95,
+        desired_kl=0.01,
+        max_grad_norm=0.5,
+        # MoE configuration
+        moe_cfg=RslRlMoECfg(
+            num_morphology_obs=11,
+            routing_type="hard",  # Must match policy routing_type
+            load_balance_coef=0.01,
+            gate_probs_log_interval=3,  # Log gate probs every N iterations
+            gate_probs_num_envs=4,  # Log first N environments
+        ),
     )
