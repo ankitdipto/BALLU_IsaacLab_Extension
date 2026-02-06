@@ -39,6 +39,8 @@ parser.add_argument("--spcf", type=float, default=0.005,
                    help="Spring coefficient")
 parser.add_argument("--spcf_range", type=float, nargs=2, default=None, 
                    help="Range of spring coefficient (min max)")
+parser.add_argument("--dl", type=int, default=None, 
+                   help="Difficulty level of the obstacle (default: 0)")
 # parser.add_argument("--fl_ratio", type=float, default=0.5, 
 #                    help="Ratio of femur length to total leg length")
 
@@ -151,12 +153,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
                    GCR=args_cli.GCR, GCR_range=args_cli.GCR_range, spcf=args_cli.spcf, spcf_range=args_cli.spcf_range)
 
-    # Shift the env origins to difficulty level 20
-    # isaac_env = env.unwrapped
-    # print("Isaac environment: ", isaac_env)
-    # inter_obstacle_spacing_y = -2.0
-    # isaac_env.scene._default_env_origins = isaac_env.scene._default_env_origins + \
-    #     torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * 20.0
+    if args_cli.dl is not None:
+        isaac_env = env.unwrapped
+        # print("Isaac environment: ", isaac_env)
+        inter_obstacle_spacing_y = -2.0
+        isaac_env.scene._default_env_origins = isaac_env.scene._default_env_origins + \
+            torch.tensor([0.0, inter_obstacle_spacing_y, 0.0], device=isaac_env.device) * args_cli.dl
 
     # wrap for video recording
     if args_cli.video:
@@ -194,6 +196,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     dump_yaml(os.path.join(log_dir, "params", "agent.yaml"), agent_cfg)
     dump_pickle(os.path.join(log_dir, "params", "env.pkl"), env_cfg)
     dump_pickle(os.path.join(log_dir, "params", "agent.pkl"), agent_cfg)
+    # dump CLI args (argparse.Namespace) into log-directory
+    # note: dump_yaml expects dict or config-class; argparse.Namespace needs explicit conversion
+    args_cli_cfg = vars(args_cli).copy()
+    dump_yaml(os.path.join(log_dir, "params", "cli.yaml"), args_cli_cfg)
 
     try:
         # run training
