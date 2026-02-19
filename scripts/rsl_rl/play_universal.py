@@ -23,7 +23,9 @@ parser.add_argument("--task", type=str, default="Isc-BALLU-hetero-general", help
 parser.add_argument("--other_dirs", type=str, default=None, help="Other directories to append to the run directory.")
 parser.add_argument("--GCR", type=float, default=0.84, 
                    help="Gravity compensation ratio")
+parser.add_argument("--GCR_range", type=float, nargs=2, default=None, help="Range of gravity compensation ratio.")
 parser.add_argument("--spcf", type=float, default=None, help="Spring Coefficient")
+parser.add_argument("--spcf_range", type=float, nargs=2, default=None, help="Range of spring coefficient.")
 parser.add_argument("-dl", "--difficulty_level", type=int, default=-1, help="Difficulty level of the obstacle.")
 parser.add_argument("--cmdir", type=str, required=True, help="Name of the common directory.")
 
@@ -108,7 +110,8 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
 
     # create isaac environment
     env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None,
-                   GCR=args_cli.GCR, spcf=args_cli.spcf)
+                   GCR=args_cli.GCR, spcf=args_cli.spcf,
+                   GCR_range=args_cli.GCR_range, spcf_range=args_cli.spcf_range)
     
     # Shifting the env origins as per the difficulty level
     isaac_env = env.unwrapped
@@ -126,11 +129,14 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     spcf = isaac_env.scene["robot"].actuators["knee_effort_actuators"].spring_coeff[0][0].item()
     GCR = isaac_env.GCR
     timestamp = datetime.datetime.now().strftime('%b%d_%H_%M_%S') # Format: Apr08_19_25_38
-    FL = get_femur_dimensions(0, side="RIGHT").height.item()
-    TL = get_tibia_dimensions(0, side="RIGHT").height.item()
-    HL = get_pelvis_dimensions(0).height.item()
+    FL = get_femur_dimensions([0], side="RIGHT").height
+    TL = get_tibia_dimensions([0], side="RIGHT").height
+    HL = get_pelvis_dimensions([0]).height
+    print("FL: ", FL)
+    print("TL: ", TL)
+    print("HL: ", HL)
     # create debug directory for this run
-    eval_folder = os.path.join(log_dir, f"{timestamp}_fl{FL:.3f}_tl{TL:.3f}_hl{HL:.3f}_gcr{GCR:.3f}_spcf{spcf:.4f}_Ht{args_cli.difficulty_level}")
+    eval_folder = os.path.join(log_dir, f"{timestamp}_fl{FL.mean().item():.3f}_tl{TL.mean().item():.3f}_hl{HL.mean().item():.3f}_gcr{GCR:.3f}_spcf{spcf:.4f}_Ht{args_cli.difficulty_level}")
     os.makedirs(eval_folder, exist_ok=True)
     print(f"[INFO] Saving plots to: {eval_folder}")
 
@@ -354,12 +360,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     #if len(toe_endpoints_world_history) > 0:
 
     # Generate plots
-    plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
-    plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, eval_folder)
+    # plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
+    # plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, eval_folder)
     # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
-    plot_base_velocity(base_vel_hist_tch, env.num_envs, eval_folder)
+    # plot_base_velocity(base_vel_hist_tch, env.num_envs, eval_folder)
     # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
-    plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, eval_folder)
+    # plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, eval_folder)
     plot_local_positions_scatter(local_positions, eval_folder, threshold_x=1.0, success_rate=success_rate)
     print("Plotting complete.")
     # Save data to CSV file for env_idx=0

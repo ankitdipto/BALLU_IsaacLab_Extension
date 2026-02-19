@@ -19,6 +19,7 @@ Root state.
 MORPH_VECTOR: torch.Tensor | None = None
 SPRING_COEFF: torch.Tensor | None = None
 BUOY_MASSES: torch.Tensor | None = None
+CLUSTER_IDS: torch.Tensor | None = None
 
 def feet_air_time(env: ManagerBasedRLEnv, sensor_cfg: SceneEntityCfg = SceneEntityCfg("contact_forces")) -> torch.Tensor:
     """Feet air time"""
@@ -103,29 +104,35 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         # do not exist yet (during manager/observation initialization), compute
         # them here and store back on the environment.
         balloon_masses = getattr(env, "balloon_buoyancy_mass_t", None)
+        assert balloon_masses is None, f"Balloon buoyancy masses should be None, got {balloon_masses}"
         if balloon_masses is None:
             robot: Articulation = env.scene[asset_cfg.name]
-            robot_total_mass = robot.data.default_mass.sum(dim=1)
+            robot_total_mass = robot.data.default_mass.sum(dim=1).to(env.device)
             # Prefer a GCR range if provided, otherwise fall back to a fixed GCR.
             gcr_range = getattr(env, "GCR_range", None)
             if gcr_range is not None:
                 gcr_tensor = (
-                    torch.rand(env.scene.num_envs, 1, device=env.device)
+                    torch.rand(env.scene.num_envs, device=env.device)
                     * (gcr_range[1] - gcr_range[0])
                     + gcr_range[0]
                 )
-                balloon_masses = gcr_tensor * robot_total_mass.mean().item()
+                balloon_masses = gcr_tensor * robot_total_mass
+                # Cache GCR tensor for clustering logic
+                env.gcr_t = gcr_tensor.squeeze(-1)
             else:
                 gcr = getattr(env, "GCR", 0.84)
-                balloon_mass = gcr * robot_total_mass.mean().item()
-                balloon_masses = torch.full(
-                    (env.scene.num_envs, 1),
-                    balloon_mass,
-                    device=env.device,
-                    dtype=robot_total_mass.dtype,
-                )
+                # balloon_mass = gcr * robot_total_mass
+                # balloon_masses = torch.full(
+                #     (env.scene.num_envs, 1),
+                #     balloon_mass,
+                #     device=env.device,
+                #     dtype=robot_total_mass.dtype,
+                # )
+                balloon_masses = gcr * robot_total_mass
+                # Cache GCR tensor for clustering logic
+                env.gcr_t = torch.full((env.num_envs,), gcr, device=env.device)
             # Cache on env so subsequent physics code can use the same values.
-            env.balloon_buoyancy_mass_t = balloon_masses
+            env.balloon_buoyancy_mass_t = balloon_masses.view(-1, 1)
         BUOY_MASSES = env.balloon_buoyancy_mass_t.clone().to('cpu')
         print(f"[DEBUG] Balloon buoyancy masses: {BUOY_MASSES}")
 
@@ -141,6 +148,7 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         # so we assign to its attribute directly instead of treating it like a dict.
         knee_actuators = robot.actuators["knee_effort_actuators"]
         knee_actuators.spring_coeff = SPRING_COEFF.clone().to(env.device)
+        env.spcf_t = SPRING_COEFF.clone().squeeze(-1).to(env.device)
 
     if MORPH_VECTOR is None:
         all_dims = get_robot_dimensions(env_indices=slice(0, env.num_envs))
@@ -160,6 +168,19 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         MORPH_VECTOR = morphology_vector
     # print(f"Morphology vector shape: {MORPH_VECTOR.shape}")
     return MORPH_VECTOR
+
+def cluster_assignment(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Returns the cached morphology cluster assignment.
+    
+    The clusters are computed once at startup via initialize_morphology_clusters.
+    """
+    if env.cluster_assignments is None:
+        # Fallback in case startup event hasn't run yet or failed
+        # raise ValueError("Cluster assignments not found. Please run initialize_morphology_clusters first.")
+        env.cluster_assignments = torch.full((env.num_envs,), -1, device=env.device, dtype=torch.long)
+    # Return as (num_envs, 1) for observation concatenation
+    # print(f"[DEBUG] Cluster assignments: {env.cluster_assignments[:10]}")
+    return env.cluster_assignments.unsqueeze(dim=-1).float()
 
 def imu_information_combined(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """IMU information combined"""

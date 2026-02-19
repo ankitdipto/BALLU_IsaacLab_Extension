@@ -92,7 +92,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_env_cfg:BalluSingleObstacleHeteroEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_general_env_cfg:BalluSingleObstacleHeteroEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
     }
 )
@@ -102,7 +102,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_dynamic_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_pretrain_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
     }
 )
@@ -153,7 +153,7 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_dynamic_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_pretrain_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUMoEPPORunnerCfg"
     }
 )
@@ -163,7 +163,47 @@ gym.register(
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
-        "env_cfg_entry_point": f"{__name__}.single_obstacle_hetero_env_cfg:BalluSingleObstacleHeteroEnvCfg",
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_general_env_cfg:BalluSingleObstacleHeteroEnvCfg",
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUMoEPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-pretrain-specialist",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_pretrain_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSpecialistPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-general-specialist",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_general_env_cfg:BalluSingleObstacleHeteroEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSpecialistPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-pretrain-soft-moe",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_pretrain_env_cfg:BalluSingleObstacleHeteroDynamicEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSoftMoEPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-general-soft-moe",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.obstacle_hetero_general_env_cfg:BalluSingleObstacleHeteroEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSoftMoEPPORunnerCfg"
     }
 )

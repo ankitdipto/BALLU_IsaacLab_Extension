@@ -34,6 +34,35 @@ def invalid_state(env: ManagerBasedRLEnv, max_root_speed: float = 10.0) -> torch
     root_linear_speed_w = torch.linalg.norm(robot.data.root_lin_vel_w, dim=1)
     root_speed_exceeds_limit = root_linear_speed_w > max_root_speed
 
+    # INSERT_YOUR_CODE
+    # Diagnostic: print which individual checks are causing invalid_mask=True
+    # checks = {
+    #     "joint_positions_are_finite": joint_positions_are_finite,
+    #     "joint_velocities_are_finite": joint_velocities_are_finite,
+    #     "root_position_is_finite": root_position_is_finite,
+    #     "root_quaternion_is_finite": root_quaternion_is_finite,
+    #     "body_link_positions_are_finite": body_link_positions_are_finite,
+    #     "body_link_quaternions_are_finite": body_link_quaternions_are_finite,
+    #     "body_link_velocities_are_finite": body_link_velocities_are_finite,
+    #     "root_speed_exceeds_limit": root_speed_exceeds_limit,
+    # }
+    # # If any invalid environment detected, print which check failed for which env
+    # if torch.any(
+    #     ~joint_positions_are_finite
+    #     | ~joint_velocities_are_finite
+    #     | ~root_position_is_finite
+    #     | ~root_quaternion_is_finite
+    #     | ~body_link_positions_are_finite
+    #     | ~body_link_quaternions_are_finite
+    #     | ~body_link_velocities_are_finite
+    #     | root_speed_exceeds_limit
+    # ):
+    #     num_envs = joint_positions_are_finite.shape[0]
+    #     for env_idx in range(num_envs):
+    #         for k, v in checks.items():
+    #             flag = v[env_idx] if v.shape == (num_envs,) else v[env_idx].item()
+    #             if (k == "root_speed_exceeds_limit" and flag) or (k != "root_speed_exceeds_limit" and not flag):
+    #                 print(f"[invalid_state] Env {env_idx}: {k} -> {flag}")
     # Invalid if any of the above checks fail
     invalid_mask = (
         (~joint_positions_are_finite)

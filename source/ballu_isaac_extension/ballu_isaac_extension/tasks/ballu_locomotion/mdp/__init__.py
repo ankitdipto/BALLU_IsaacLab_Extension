@@ -12,3 +12,4 @@ from .curriculums import *  # noqa: F401, F403
 from .observations import *  # noqa: F401, F403
 from .terminations import *  # noqa: F401, F403
 from .geometry_utils import *  # noqa: F401, F403
+from .events import *  # noqa: F401, F403
