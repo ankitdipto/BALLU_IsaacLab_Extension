@@ -108,28 +108,27 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         if balloon_masses is None:
             robot: Articulation = env.scene[asset_cfg.name]
             robot_total_mass = robot.data.default_mass.sum(dim=1).to(env.device)
-            # Prefer a GCR range if provided, otherwise fall back to a fixed GCR.
+            # Priority: GCR_values (per-env list) > GCR_range (uniform) > GCR (scalar).
+            gcr_values = getattr(env, "GCR_values", None)
             gcr_range = getattr(env, "GCR_range", None)
-            if gcr_range is not None:
+            if gcr_values is not None:
+                gcr_tensor = torch.as_tensor(gcr_values, device=env.device, dtype=torch.float32)
+                if gcr_tensor.shape[0] < env.scene.num_envs:
+                    reps = (env.scene.num_envs + gcr_tensor.shape[0] - 1) // gcr_tensor.shape[0]
+                    gcr_tensor = gcr_tensor.repeat(reps)[: env.scene.num_envs]
+                balloon_masses = gcr_tensor * robot_total_mass
+                env.gcr_t = gcr_tensor
+            elif gcr_range is not None:
                 gcr_tensor = (
                     torch.rand(env.scene.num_envs, device=env.device)
                     * (gcr_range[1] - gcr_range[0])
                     + gcr_range[0]
                 )
                 balloon_masses = gcr_tensor * robot_total_mass
-                # Cache GCR tensor for clustering logic
                 env.gcr_t = gcr_tensor.squeeze(-1)
             else:
                 gcr = getattr(env, "GCR", 0.84)
-                # balloon_mass = gcr * robot_total_mass
-                # balloon_masses = torch.full(
-                #     (env.scene.num_envs, 1),
-                #     balloon_mass,
-                #     device=env.device,
-                #     dtype=robot_total_mass.dtype,
-                # )
                 balloon_masses = gcr * robot_total_mass
-                # Cache GCR tensor for clustering logic
                 env.gcr_t = torch.full((env.num_envs,), gcr, device=env.device)
             # Cache on env so subsequent physics code can use the same values.
             env.balloon_buoyancy_mass_t = balloon_masses.view(-1, 1)
@@ -137,8 +136,17 @@ def morphology_vector_priv(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = S
         print(f"[DEBUG] Balloon buoyancy masses: {BUOY_MASSES}")
 
     if SPRING_COEFF is None:
-        if env.spcf_range is not None:
-            SPRING_COEFF = generated_spring_coeff(env, low=env.spcf_range[0], high=env.spcf_range[1])
+        # Priority: spcf_values (per-env list) > spcf_range (uniform) > spcf (scalar).
+        spcf_values = getattr(env, "spcf_values", None)
+        spcf_range = getattr(env, "spcf_range", None)
+        if spcf_values is not None:
+            spcf_tensor = torch.as_tensor(spcf_values, dtype=torch.float32).view(-1, 1)
+            if spcf_tensor.shape[0] < env.num_envs:
+                reps = (env.num_envs + spcf_tensor.shape[0] - 1) // spcf_tensor.shape[0]
+                spcf_tensor = spcf_tensor.repeat(reps, 1)[: env.num_envs]
+            SPRING_COEFF = spcf_tensor
+        elif spcf_range is not None:
+            SPRING_COEFF = generated_spring_coeff(env, low=spcf_range[0], high=spcf_range[1])
         else:
             SPRING_COEFF = torch.full((env.num_envs, 1), env.spcf, dtype=torch.float32)
         assert SPRING_COEFF.shape == (env.num_envs, 1), f"Spring coefficient shape mismatch, expected (num_envs, 1), got {SPRING_COEFF.shape}"

@@ -35,12 +35,21 @@ parser.add_argument("--GCR", type=float, default=0.84,
                    help="Gravity compensation ratio")
 parser.add_argument("--GCR_range", type=float, nargs=2, default=None, 
                    help="Range of gravity compensation ratio (min max)")
+parser.add_argument("--GCR_samples_file", type=str, default=None,
+                   help="Path to a .npy file with per-env GCR values (shape: num_envs,). "
+                        "Takes priority over --GCR_range and --GCR.")
 parser.add_argument("--spcf", type=float, default=0.005, 
                    help="Spring coefficient")
 parser.add_argument("--spcf_range", type=float, nargs=2, default=None, 
                    help="Range of spring coefficient (min max)")
+parser.add_argument("--spcf_samples_file", type=str, default=None,
+                   help="Path to a .npy file with per-env spcf values (shape: num_envs,). "
+                        "Takes priority over --spcf_range and --spcf.")
 parser.add_argument("--dl", type=int, default=None, 
                    help="Difficulty level of the obstacle (default: 0)")
+parser.add_argument("--resume_path", type=str, default=None,
+                   help="Full absolute path to a checkpoint to warm-start from. "
+                        "Takes priority over agent_cfg.resume / --load_run / --checkpoint.")
 # parser.add_argument("--fl_ratio", type=float, default=0.5, 
 #                    help="Ratio of femur length to total leg length")
 
@@ -67,6 +76,7 @@ sys.argv = [sys.argv[0]] + hydra_args
 import gymnasium as gym
 import os
 import torch
+import numpy as np
 from datetime import datetime
 import math
 import traceback
@@ -149,9 +159,25 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
         # set the reward standard deviation for velocity tracking
         env_cfg.rewards.track_lin_vel_xy_exp.params["std"] = math.sqrt(args_cli.reward_std)
     
+    # Load per-env sample files if provided (PEC expert training mode).
+    # These take priority over --GCR_range/--GCR and --spcf_range/--spcf respectively.
+    gcr_values = None
+    if args_cli.GCR_samples_file is not None:
+        gcr_values = np.load(args_cli.GCR_samples_file).tolist()
+        print(f"[INFO] Loaded {len(gcr_values)} GCR samples from: {args_cli.GCR_samples_file}")
+
+    spcf_values = None
+    if args_cli.spcf_samples_file is not None:
+        spcf_values = np.load(args_cli.spcf_samples_file).tolist()
+        print(f"[INFO] Loaded {len(spcf_values)} spcf samples from: {args_cli.spcf_samples_file}")
+
     # create isaac environment
-    env = gym.make(args_cli.task, cfg=env_cfg, render_mode="rgb_array" if args_cli.video else None, 
-                   GCR=args_cli.GCR, GCR_range=args_cli.GCR_range, spcf=args_cli.spcf, spcf_range=args_cli.spcf_range)
+    env = gym.make(
+        args_cli.task, cfg=env_cfg,
+        render_mode="rgb_array" if args_cli.video else None,
+        GCR=args_cli.GCR, GCR_range=args_cli.GCR_range, GCR_values=gcr_values,
+        spcf=args_cli.spcf, spcf_range=args_cli.spcf_range, spcf_values=spcf_values,
+    )
 
     if args_cli.dl is not None:
         isaac_env = env.unwrapped
@@ -183,8 +209,11 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     runner = OnPolicyRunner(env, agent_cfg.to_dict(), log_dir=log_dir, device=agent_cfg.device)
     # write git state to logs
     runner.add_git_repo_to_log(__file__)
-    # save resume path before creating a new log_dir
-    if agent_cfg.resume:
+    # Warm-start: --resume_path (full path, PEC) takes priority over agent_cfg.resume
+    if args_cli.resume_path is not None:
+        print(f"[INFO]: Warm-starting from checkpoint: {args_cli.resume_path}")
+        runner.load(args_cli.resume_path)
+    elif agent_cfg.resume:
         # get path to previous checkpoint
         resume_path = get_checkpoint_path(log_root_path, agent_cfg.load_run, agent_cfg.load_checkpoint)
         print(f"[INFO]: Loading model checkpoint from: {resume_path}")
