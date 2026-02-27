@@ -203,7 +203,7 @@ def main():
     #
     # The exact log_dir is parsed from the "EXP_DIR: ..." line printed by train.py.
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    common_folder = f"{timestamp}_{args.run_name}/expert_{args.expert_id}"
+    common_folder = f"{args.run_name}/expert_{args.expert_id}"
     run_name_tag  = f"iter_{iteration}"
 
     # ── Warm-start detection ──────────────────────────────────────────────────
