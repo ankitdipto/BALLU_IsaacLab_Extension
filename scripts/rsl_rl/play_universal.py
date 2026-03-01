@@ -52,6 +52,7 @@ sys.argv = [sys.argv[0]] + hydra_args
 import gymnasium as gym
 import os
 import torch
+import numpy as np
 import pandas as pd
 
 from rsl_rl.runners import OnPolicyRunner
@@ -362,10 +363,10 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     # Generate plots
     # plot_joint_data(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
     # plot_root_com_xy(root_com_xyz_hist_tch, env.num_envs, eval_folder)
-    # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, play_folder)
+    # plot_feet_heights(left_foot_pos_history, right_foot_pos_history, env.num_envs, eval_folder)
     # plot_base_velocity(base_vel_hist_tch, env.num_envs, eval_folder)
     # plot_knee_phase_portraits(joint_pos_hist_tch, joint_vel_hist_tch, robots_data.joint_names, env.num_envs, eval_folder)
-    # plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, eval_folder)
+    plot_toe_heights(toe_endpoints_world_hist_tch, env.num_envs, eval_folder)
     plot_local_positions_scatter(local_positions, eval_folder, threshold_x=1.0, success_rate=success_rate)
     print("Plotting complete.")
     # Save data to CSV file for env_idx=0
@@ -416,6 +417,12 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg, agen
     csv_path = os.path.join(eval_folder, "results.csv")
     df.to_csv(csv_path, index=False)
     print(f"[INFO] Saved data to CSV file: {csv_path}")
+    
+    # save toe_endpoints_world_hist_tch to numpy file
+    toe_endpoints_world_hist_np = toe_endpoints_world_hist_tch.cpu().numpy()
+    toe_results_file = os.path.join(eval_folder, "toe_endpoints_world_hist.npy")
+    np.save(toe_results_file, toe_endpoints_world_hist_np)
+    print(f"[INFO] Saved toe_endpoints_world_hist to numpy file: {toe_results_file}")
     
     # Save MoE expert indices to text file
     if is_moe_policy and len(expert_indices_history) > 0:
