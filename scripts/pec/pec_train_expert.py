@@ -284,17 +284,26 @@ def main():
 
     elapsed = (time.time() - t_start) / 60.0
 
-    if process.returncode != 0:
-        print(f"\n[ERROR] Training subprocess exited with code {process.returncode}.")
-        sys.exit(process.returncode)
-
-    print(f"\n{'='*70}")
-    print(f"  Training completed in {elapsed:.1f} min.")
+    crashed = process.returncode != 0
+    if crashed:
+        print(f"\n[WARN] Training subprocess crashed (exit {process.returncode}).")
+        print(f"       Attempting to salvage model_best.pt from EXP_DIR...")
+    else:
+        print(f"\n{'='*70}")
+        print(f"  Training completed in {elapsed:.1f} min.")
 
     # ── Resolve checkpoint path ───────────────────────────────────────────────
+    # train.py prints EXP_DIR: even on crash (emitted at the end of main()).
+    # If it was never printed, the crash happened before any training began.
     if exp_dir is None:
-        print("[ERROR] Could not parse EXP_DIR from train.py output.")
-        print("        Check the training log and update pec_state.json manually.")
+        if crashed:
+            print("[ERROR] EXP_DIR was never printed — training crashed before "
+                  "logging started. No checkpoint to salvage.")
+            print("        The orchestrator will fall back to the previous "
+                  "iteration's checkpoint.")
+        else:
+            print("[ERROR] Could not parse EXP_DIR from train.py output.")
+            print("        Check the training log and update pec_state.json manually.")
         sys.exit(1)
 
     ckpt_path = os.path.join(exp_dir, "model_best.pt")
@@ -302,14 +311,27 @@ def main():
         ckpt_path = os.path.join(PROJECT_ROOT, ckpt_path)
 
     if not os.path.exists(ckpt_path):
-        print(f"[WARNING] model_best.pt not found at: {ckpt_path}")
-        print("          The state file will record this path anyway.")
+        if crashed:
+            print(f"[ERROR] Training crashed and model_best.pt not found at:")
+            print(f"        {ckpt_path}")
+            print(f"        No salvageable checkpoint — aborting.")
+            sys.exit(process.returncode)
+        else:
+            print(f"[WARNING] model_best.pt not found at: {ckpt_path}")
+            print("          The state file will record this path anyway.")
     else:
-        print(f"  Checkpoint found : {ckpt_path}")
+        if crashed:
+            print(f"  [WARN] Checkpoint salvaged despite crash:")
+            print(f"         {ckpt_path}")
+            print(f"  Expert {args.expert_id} will warm-start from this checkpoint "
+                  f"in the next PEC iteration.")
+        else:
+            print(f"  Checkpoint found : {ckpt_path}")
 
     # ── Update PEC state ──────────────────────────────────────────────────────
-    expert["checkpoint"] = ckpt_path
-    expert["trained"]    = True
+    expert["checkpoint"]              = ckpt_path
+    expert["trained"]                 = True
+    expert["last_trained_pec_iter"]   = iteration
 
     with open(state_path, "w") as f:
         json.dump(state, f, indent=2)
