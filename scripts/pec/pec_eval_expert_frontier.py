@@ -8,10 +8,11 @@ designs in a single Isaac Sim process.  Each candidate design gets its own
 parallel simulation environment (num_envs = number of candidates).
 
 The curriculum runs independently per environment: after N episodes each
-environment's Y-origin encodes the highest obstacle difficulty the expert
-could clear for that design.  We track the running-maximum level index per
-environment throughout the evaluation so that curriculum oscillations do not
-hide the true performance ceiling.
+environment's Y-origin encodes the final obstacle difficulty level the expert
+settled at for that design.  The curriculum can advance or retreat after each
+episode (based on whether the robot cleared the obstacle), so the reported
+score is the level reached at the last episode reset, not the maximum ever
+achieved.
 
 Output
 ------
