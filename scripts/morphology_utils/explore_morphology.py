@@ -51,7 +51,7 @@ def run_training_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/03.03.2026/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/03.10.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -110,7 +110,7 @@ def run_testing_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/03.03.2026/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/03.10.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -180,14 +180,14 @@ def objective(
     print(f"\n{'='*80}\n[TRIAL {trial.number}]\n{'='*80}")
     
     # Sample parameters
-    femur_length = trial.suggest_float("femur_length", 0.30, 0.48)
-    tibia_length = trial.suggest_float("tibia_length", 0.30, 0.43)
+    femur_length = trial.suggest_float("femur_length", 0.20, 0.48)
+    tibia_length = trial.suggest_float("tibia_length", 0.20, 0.43)
     # hip_width = trial.suggest_float("hip_width", 0.08, 0.14)
     # femur_to_limb_ratio = trial.suggest_float("femur_to_limb_ratio", 0.20, 0.70)
     # knee_damping = trial.suggest_float("Kd_knee", 0.06, 0.50)
     # spring_damping = trial.suggest_float("Kd_spring", 0.001, 0.08)
-    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.75, 0.87)
-    spring_coeff = trial.suggest_float("spring_coeff", 1e-3, 1e-2)
+    gravity_comp_ratio = trial.suggest_float("gravity_comp_ratio", 0.74, 0.89)
+    spring_coeff = trial.suggest_float("spring_coeff", 5e-3, 1e-1)
     # morph_id = f"trial{trial.number:02d}_f{femur_length:.2f}_t{tibia_length:.2f}_knKd{knee_damping:.2f}"
     morph_id = f"trial{trial.number:02d}_fl{femur_length:.3f}_tl{tibia_length:.3f}_spc{spring_coeff:.3f}_gcr{gravity_comp_ratio:.3f}"
 
@@ -232,6 +232,10 @@ def objective(
     # Run testing for this morphology
     run_name = log_dir.split("/")[-1] if log_dir else ""
     difficulty = int(best_crclm_level * 100) - 1 if best_crclm_level > 0 else 0
+    
+    if "ramp" in task:
+        difficulty = (difficulty - 1) // 2
+        
     print(f"[Trial {trial.number}] Starting testing (difficulty={difficulty})...")
     test_success, test_command = run_testing_experiment(
         morph_id=final_morph_id,
