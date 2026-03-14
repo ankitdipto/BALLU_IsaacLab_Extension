@@ -8,8 +8,8 @@ from isaaclab.assets import Articulation, RigidObject, AssetBase
 from isaaclab.terrains import TerrainImporter
 from isaaclab.managers import SceneEntityCfg
 import isaaclab.sim as sim_utils
-import omni.usd
-from pxr import Gf, Sdf, UsdGeom, Vt, Usd
+import omni.usd # type: ignore
+from pxr import Gf, Sdf, UsdGeom, Vt, Usd # type: ignore
 
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
