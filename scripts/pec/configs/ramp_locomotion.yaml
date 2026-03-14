@@ -1,0 +1,145 @@
+# ============================================================
+# PEC (Progressive Expert Coverage) Configuration Template
+# ============================================================
+# Usage:
+#   python scripts/pec/pec_run.py \
+#       --run_name  my_run \
+#       --config    scripts/pec/pec_config_template.yaml
+#
+# Copy this file and edit for your specific run.
+# Only the fields listed as REQUIRED need to be set;
+# all others fall back to the defaults shown here.
+# ============================================================
+
+
+# ── Initialization ───────────────────────────────────────────
+# These values are passed to pec_init.py on the first run.
+
+K: 2                        # Number of specialist experts
+
+GCR_range: [0.725, 0.89]     # [min, max] Gravity Compensation Ratio — REQUIRED
+spcf_range: [0.005, 0.100]  # [min, max] Spring Coefficient          — REQUIRED
+
+N_init: 50                  # Initial designs sampled per expert from its Gaussian
+
+sigma_scale: 0.10           # Controls initial Gaussian width.
+                            # std_d = sigma_scale * range_d / sqrt(K)
+                            # 0.10 → very narrow specialists
+                            # 0.20 → moderate overlap
+                            # 0.30 → broad initial regions
+                            # If target_init_coverage is set, this becomes the
+                            # initial guess for sigma calibration.
+
+seed: 0                  # Global random seed (init + training)
+
+init_strategy: "stochastic_fps"       # Automatic center placement for pec_init.py.
+                            #   "grid"           — legacy square-ish grid
+                            #   "stochastic_fps" — boundary-aware, seed-controlled
+                            #                       farthest-point sampling
+
+init_seed: 0                # Preferred global seed for stochastic center placement
+                            # and initial design sampling. If omitted in CLI/config,
+                            # pec_init.py falls back to `seed`.
+
+init_anchor_region: null
+                            # Optional seeded anchor for stochastic_fps.
+                            #   null        — no forced region
+                            #   "top_right" — guarantee one initial expert starts
+                            #                 in the high-GCR / high-spcf region
+
+target_init_coverage: 0.12  # Optional MC coverage target in (0, 1).
+                            # If set, pec_init.py calibrates sigma_scale so the
+                            # realised init coverage matches this target.
+                            # For stochastic_fps, null means: match the legacy
+                            # grid coverage at the same K and sigma_scale.
+
+usd_rel_path: morphologies/hetero_library_hvyBloon_ramp_lab03.17.2026/hetero_0001_fl0.227_tl0.285/hetero_0001_fl0.227_tl0.285.usd
+                            # Relative path to the robot USD file; injected into
+                            # every Isaac Sim subprocess as BALLU_USD_REL_PATH.
+                            # Example:
+                            #   "morphologies/hetero_library_v1/robot_0/robot_0.usd"
+
+centers: null               # Optional manual Gaussian centers.
+                            # Provide as a list of [GCR, spcf] pairs, length K.
+                            # If null, centers are placed on an automatic grid.
+                            # Example (K=3):
+                            #   centers:
+                            #     - [0.79, 0.0035]
+                            #     - [0.85, 0.0075]
+                            #     - [0.82, 0.0055]
+
+
+# ── Loop Control ─────────────────────────────────────────────
+
+max_pec_iterations: 7      # Maximum number of PEC iterations (train→eval→refit)
+                            # Can be overridden on the CLI with --max_pec_iterations.
+
+coverage_target: 0.95       # Stop early when MC coverage (exp(-2) threshold)
+                            # exceeds this fraction of the design space.
+
+dl_initial: 0               # Starting obstacle difficulty level for PEC iteration 0.
+                            # Passed as --dl to pec_train_expert.py.
+                            # 0 = flat ground; higher = harder start.
+
+dl_buffer: 2                # Safety margin for auto-scaling --dl in later iterations.
+                            # dl_k = max(0, floor(mean_score_k_prev_eval) - dl_buffer)
+                            # Increase to start training slightly below the expert's
+                            # demonstrated capability; decrease for aggressive curriculum.
+
+
+# ── Expert Training (Step 1) ─────────────────────────────────
+# Passed to pec_train_expert.py (which in turn calls scripts/rsl_rl/train.py).
+
+task: "Isc-BALLU-hetero-general-ramp"  # Isaac Lab task name
+
+num_envs: 4096              # Parallel simulation environments per training run
+max_iterations_iter0: 1700  # PPO steps for PEC iteration 0 (train from scratch — needs more)
+max_iterations: 500         # PPO steps for PEC iterations >= 1 (warm-start — fewer needed)
+headless: true              # Run Isaac Sim without a display
+device: "cuda:0"            # Torch/CUDA device
+train_timeout_h: 8.0        # Hard timeout (hours) for each training subprocess
+
+
+# ── Frontier Evaluation (Step 2) ─────────────────────────────
+# Passed to pec_evaluate_frontier.py.
+
+F: 100                      # Number of frontier/border candidates to evaluate
+pool_factor: 20             # Oversample pool size = pool_factor * F
+
+sampling_mode: "auto"       # Candidate sampling strategy:
+                            #   "frontier" — lowest max log-density (farthest from all Gaussians)
+                            #   "border"   — annular band just outside Gaussian cores
+                            #   "auto"     — border for iter < auto_switch_iter, then frontier
+
+auto_switch_iter: 5         # In "auto" mode: switch from border to frontier after this iteration
+
+border_inner_ld: -0.5       # Upper log-density cut for border mode
+                            # Designs with max_k log p(θ|G_k) > border_inner_ld are already
+                            # well-covered and excluded. (~inside the 1-sigma core)
+
+border_outer_ld: -2.5       # Lower log-density cut for border mode
+                            # Designs with max_k log p(θ|G_k) < border_outer_ld are in the
+                            # far frontier; excluded in border mode. (~beyond 2-sigma)
+
+num_episodes: 20             # Episodes per frontier design during evaluation
+start_difficulty: 40         # Starting obstacle level index for each eval env
+                            # Evaluation curricula begin here and advance/retreat.
+eval_timeout_h: 4.0         # Hard timeout (hours) per expert evaluation subprocess
+
+
+# ── Gaussian Refit (Step 3) ──────────────────────────────────
+# Passed to pec_refit_gaussians.py.
+
+min_var_scale: 0.01         # Minimum std as fraction of range; variance floor =
+                            # (min_var_scale * range_d)^2. Prevents Gaussian collapse.
+
+min_designs: 2              # Minimum number of assigned designs required before
+                            # refitting; experts below this threshold keep their
+                            # current mu/sigma.
+
+
+# ── Paths ────────────────────────────────────────────────────
+
+log_root: "logs/pec/2026.03.17"        # Root directory for all PEC state and result files.
+                                       # State file: logs/pec/<run_name>/pec_state.json
+                                       # Run from ballu_isclb_extension/.
