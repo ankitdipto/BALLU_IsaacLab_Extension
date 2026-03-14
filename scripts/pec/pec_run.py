@@ -212,6 +212,14 @@ def step_init(run_name: str, config: dict, overwrite: bool) -> int:
         "--seed",        config.get("seed", 42),
         "--log_root",    config.get("log_root", "logs/pec"),
     ]
+    if config.get("init_strategy") is not None:
+        args += ["--init_strategy", config["init_strategy"]]
+    if config.get("init_seed") is not None:
+        args += ["--init_seed", config["init_seed"]]
+    if config.get("init_anchor_region") is not None:
+        args += ["--init_anchor_region", config["init_anchor_region"]]
+    if config.get("target_init_coverage") is not None:
+        args += ["--target_init_coverage", config["target_init_coverage"]]
     if config.get("usd_rel_path"):
         args += ["--usd_rel_path", config["usd_rel_path"]]
     if config.get("centers"):
@@ -414,6 +422,16 @@ def main():
                         help="Override max_iterations (PEC iter >= 1) from the config file.")
     parser.add_argument("--max_iterations_iter0", type=int, default=None,
                         help="Override max_iterations_iter0 (PEC iter 0) from the config file.")
+    parser.add_argument("--init_strategy", type=str, default=None,
+                        choices=["grid", "stochastic_fps"],
+                        help="Override init_strategy from the config file.")
+    parser.add_argument("--init_seed", type=int, default=None,
+                        help="Override init_seed from the config file.")
+    parser.add_argument("--init_anchor_region", type=str, default=None,
+                        choices=["top_right"],
+                        help="Override init_anchor_region from the config file.")
+    parser.add_argument("--target_init_coverage", type=float, default=None,
+                        help="Override target_init_coverage from the config file.")
     parser.add_argument("--overwrite", action="store_true",
                         help="Force re-initialisation even if pec_state.json "
                              "already exists (passes --overwrite to pec_init.py).")
@@ -429,6 +447,14 @@ def main():
         config["max_iterations"] = args.max_iterations
     if args.max_iterations_iter0 is not None:
         config["max_iterations_iter0"] = args.max_iterations_iter0
+    if args.init_strategy is not None:
+        config["init_strategy"] = args.init_strategy
+    if args.init_seed is not None:
+        config["init_seed"] = args.init_seed
+    if args.init_anchor_region is not None:
+        config["init_anchor_region"] = args.init_anchor_region
+    if args.target_init_coverage is not None:
+        config["target_init_coverage"] = args.target_init_coverage
 
     log_root           = config.get("log_root", "logs/pec")
     run_dir            = os.path.join(log_root, args.run_name)

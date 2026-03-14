@@ -27,8 +27,31 @@ sigma_scale: 0.10           # Controls initial Gaussian width.
                             # 0.10 → very narrow specialists
                             # 0.20 → moderate overlap
                             # 0.30 → broad initial regions
+                            # If target_init_coverage is set, this becomes the
+                            # initial guess for sigma calibration.
 
-seed: 42                    # Global random seed (init + training)
+seed: 0                  # Global random seed (init + training)
+
+init_strategy: "stochastic_fps"       # Automatic center placement for pec_init.py.
+                            #   "grid"           — legacy square-ish grid
+                            #   "stochastic_fps" — boundary-aware, seed-controlled
+                            #                       farthest-point sampling
+
+init_seed: 1                # Preferred global seed for stochastic center placement
+                            # and initial design sampling. If omitted in CLI/config,
+                            # pec_init.py falls back to `seed`.
+
+init_anchor_region: "top_right"
+                            # Optional seeded anchor for stochastic_fps.
+                            #   null        — no forced region
+                            #   "top_right" — guarantee one initial expert starts
+                            #                 in the high-GCR / high-spcf region
+
+target_init_coverage: 0.12  # Optional MC coverage target in (0, 1).
+                            # If set, pec_init.py calibrates sigma_scale so the
+                            # realised init coverage matches this target.
+                            # For stochastic_fps, null means: match the legacy
+                            # grid coverage at the same K and sigma_scale.
 
 usd_rel_path: morphologies/hetero_library_hvyBloon_lab01.20.26/hetero_0001_fl0.312_tl0.398/hetero_0001_fl0.312_tl0.398.usd
                             # Relative path to the robot USD file; injected into
@@ -70,7 +93,7 @@ dl_buffer: 2                # Safety margin for auto-scaling --dl in later itera
 task: "Isc-BALLU-hetero-general"  # Isaac Lab task name
 
 num_envs: 4096              # Parallel simulation environments per training run
-max_iterations_iter0: 1500  # PPO steps for PEC iteration 0 (train from scratch — needs more)
+max_iterations_iter0: 1600  # PPO steps for PEC iteration 0 (train from scratch — needs more)
 max_iterations: 500         # PPO steps for PEC iterations >= 1 (warm-start — fewer needed)
 headless: true              # Run Isaac Sim without a display
 device: "cuda:0"            # Torch/CUDA device
@@ -117,6 +140,6 @@ min_designs: 2              # Minimum number of assigned designs required before
 
 # ── Paths ────────────────────────────────────────────────────
 
-log_root: "logs/pec"        # Root directory for all PEC state and result files.
-                            # State file: logs/pec/<run_name>/pec_state.json
-                            # Run from ballu_isclb_extension/.
+log_root: "logs/pec/2026.17.03"        # Root directory for all PEC state and result files.
+                                       # State file: logs/pec/<run_name>/pec_state.json
+                                       # Run from ballu_isclb_extension/.

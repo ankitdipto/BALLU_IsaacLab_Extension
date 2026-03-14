@@ -13,7 +13,9 @@ Gaussian centre).
 
 ```
 INIT      pec_init.py
-            └─ seed K Gaussians, sample N_init designs per expert
+            └─ seed K Gaussians (grid / stochastic_fps),
+               optionally calibrate sigma to a target coverage,
+               sample N_init designs per expert
                save pec_state.json
 
 LOOP (repeat until coverage converges)
@@ -64,6 +66,11 @@ Every script reads and/or writes `logs/pec/<run_name>/pec_state.json`.
   "run_name":     "my_run",
   "iteration":    3,
   "usd_rel_path": "morphologies/.../robot.usd",
+  "init_strategy": "stochastic_fps",
+  "init_seed": 123,
+  "init_sigma_scale": 0.412,
+  "init_target_coverage": 0.817,
+  "init_realized_coverage": 0.818,
   "design_space": { "GCR": [0.75, 0.89], "spcf": [0.001, 0.010] },
   "experts": [
     {
@@ -103,11 +110,33 @@ conda run -n BALLU_env0 python scripts/pec/pec_init.py \
     --sigma_scale 0.10 \
     --N_init     16 \
     --usd_rel_path morphologies/.../robot.usd \
-    --centers 0.79 0.0035  0.85 0.0075  0.82 0.0055
+    --init_strategy stochastic_fps \
+    --init_seed 123
 ```
 
-`--centers` takes `K` GCR/spcf pairs and overrides the automatic grid
-placement. Omit it to use the default grid.
+Initialisation modes:
+
+| Mode | How centers are chosen | Notes |
+|------|------------------------|-------|
+| `grid` | Legacy square-ish grid, truncated to K | Default for backward compatibility |
+| `stochastic_fps` | Boundary-aware, seed-controlled farthest-point sampling in normalized design space | Better symmetry for odd K and discourages corner starts |
+| `--centers ...` | Manual GCR/spcf pairs | Overrides automatic placement entirely |
+
+Useful init arguments:
+
+| Argument | Purpose |
+|----------|---------|
+| `--init_strategy {grid,stochastic_fps}` | Choose automatic center placement mode |
+| `--init_seed` | Global seed for center placement and initial design sampling |
+| `--target_init_coverage` | Optional MC coverage target in `(0, 1)` |
+| `--init_pool_size` | Candidate pool size for `stochastic_fps` |
+| `--init_jitter_scale` | Optional small jitter in normalized space |
+| `--coverage_seed` | Fixed seed used for coverage estimation / sigma calibration |
+
+If `--init_strategy stochastic_fps` is used and `--target_init_coverage` is
+omitted, `pec_init.py` defaults to the coverage produced by the legacy grid at
+the same `K` and `sigma_scale`. This keeps the initial coverage budget similar
+across different seeds while letting the expert regions move.
 
 **sigma_scale guidance:**
 
@@ -117,6 +146,10 @@ placement. Omit it to use the default grid.
 | 0.15 | ~11% | very small | Moderate separation |
 | 0.20 | ~14% | moderate | Broader coverage |
 | 0.30 | ~21% | large | Wide initial regions |
+
+When `--target_init_coverage` is set, `sigma_scale` becomes the initial guess
+for a short 1D calibration search and the realised value is written back to
+`pec_state.json` as `init_sigma_scale`.
 
 ### Step 1 — Train each expert
 
