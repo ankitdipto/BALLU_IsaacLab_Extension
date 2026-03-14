@@ -237,7 +237,7 @@ vmax = int(max(abs(diff_pec).max(), 1))
 
 # Left: winning expert for each design (colour) + GES score (size)
 ax = axes[0]
-norm_size = 10 + 25 * (pec_scores - pec_scores.min()) / max(pec_scores.ptp(), 1)
+norm_size = 10 + 25 * (pec_scores - pec_scores.min()) / max(np.ptp(pec_scores), 1)
 for kid in range(K):
     mask = (pec_winner == kid)
     ax.scatter(spcf_all[mask], gcr_all[mask], c=expert_color(kid),
