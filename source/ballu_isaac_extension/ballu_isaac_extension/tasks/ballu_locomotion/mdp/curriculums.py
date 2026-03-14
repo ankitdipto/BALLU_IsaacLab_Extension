@@ -129,6 +129,68 @@ def obstacle_height_levels_same_row(
     curr_mean_obstacle_height = env.obstacle_height_list[int(curr_mean_level)]
     return curr_mean_obstacle_height
 
+def ramp_height_levels_same_row(
+    env: ManagerBasedRLEnv,
+    env_ids: Sequence[int],
+    ramp_end_x: float = 2.0,
+    ramp_start_x: float = 0.5,
+    inter_ramp_spacing_y: float = 2.0,
+    warmup_period: int = 100,
+    upgrade_threshold: float = 0.8,
+    downgrade_threshold: float = 0.35,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+) -> float:
+    """Curriculum that shifts env origins along -Y to face progressively taller ramps.
+
+    Each ramp in the global scene spans x ∈ [``ramp_start_x``, ``ramp_end_x``].
+    On episode reset the robot's final x-position determines whether the env
+    advances to a harder ramp (larger height) or falls back to an easier one.
+
+    Args:
+        env: The learning environment.
+        env_ids: Environments being reset.
+        ramp_end_x: World x-coordinate of the ramp's high end.  Robot must pass
+            this threshold to be considered successful. Defaults to 2.0 m.
+        ramp_start_x: World x-coordinate of the ramp's low end.  Robot that
+            never reaches this threshold is considered to have failed.
+            Defaults to 0.5 m.
+        inter_ramp_spacing_y: Spacing (m) between adjacent ramp centres along -Y.
+            Defaults to 2.0 m.
+        warmup_period: Number of PPO iterations before curriculum activates.
+            Defaults to 100.
+        asset_cfg: Robot articulation scene entity.
+
+    Returns:
+        Mean ramp height (m) across all environments (for logging).
+    """
+    if env.rsl_rl_iteration < warmup_period:
+        return 0.0
+
+    robot: Articulation = env.scene[asset_cfg.name]
+    env_ids_t = torch.as_tensor(env_ids, device=robot.device, dtype=torch.long)
+
+    final_robot_positions_x = robot.data.root_pos_w[env_ids_t, 0]
+    upgrade = final_robot_positions_x > ramp_start_x + upgrade_threshold * (ramp_end_x - ramp_start_x)
+    downgrade = final_robot_positions_x < ramp_start_x + downgrade_threshold * (ramp_end_x - ramp_start_x)
+    # Mutual exclusivity: upgrading takes priority
+    downgrade *= ~upgrade
+
+    new_env_origins_y = (
+        env.scene.env_origins[env_ids_t, 1]
+        - inter_ramp_spacing_y * upgrade.float()
+        + inter_ramp_spacing_y * downgrade.float()
+    )
+    new_env_origins_y = new_env_origins_y.clip(
+        min=-inter_ramp_spacing_y * 74, max=0.0
+    )
+    env.scene._default_env_origins[env_ids_t, 1] = new_env_origins_y
+
+    curr_mean_level = (
+        -new_env_origins_y.mean(dim=0).detach().cpu().item() / inter_ramp_spacing_y
+    )
+    return env.obstacle_height_list[int(curr_mean_level)]
+
+
 def obstacle_height_levels(
     env: ManagerBasedRLEnv,
     env_ids: Sequence[int],

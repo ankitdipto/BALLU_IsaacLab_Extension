@@ -46,6 +46,7 @@ import isaaclab.utils.math as math_utils
 from ballu_isaac_extension.tasks.ballu_locomotion.flat_env_cfg import BalluFlatEnvCfg
 from ballu_isaac_extension.tasks.ballu_locomotion.rough_env_cfg import BalluRoughEnvCfg
 from ballu_isaac_extension.tasks.ballu_locomotion.single_obstacle_env_cfg import BalluSingleObstacleEnvCfg
+from ballu_isaac_extension.tasks.ballu_locomotion.single_ramp_env_cfg import BalluSingleRampEnvCfg
 from ballu_isaac_extension.tasks.ballu_locomotion.mdp.geometry_utils import get_robot_dimensions
 from action_generators import *
 import os
@@ -102,7 +103,8 @@ def main():
     # print("Morphology name: ", modifier.morphology_name)
     # os.environ['BALLU_PATH'] = f"{modifier.morphology_name}/{modifier.morphology_name}.usd"
 
-    env_cfg = BalluFlatEnvCfg()
+    env_cfg = BalluSingleRampEnvCfg()
+    # env_cfg = BalluFlatEnvCfg()
     # env_cfg = BalluSingleObstacleEnvCfg()
     env_cfg.scene.num_envs = args_cli.num_envs
     #env_cfg.scene.robot.init_state.pos = (0.0, 0.0, 1.0)
@@ -161,10 +163,10 @@ def main():
         with torch.inference_mode():
             
             #actions = get_periodic_action(count, period = 500, num_envs=args_cli.num_envs)
-            actions = stepper(count, period = 80, num_envs=args_cli.num_envs)
+            #actions = stepper(count, period = 80, num_envs=args_cli.num_envs)
             #actions = left_leg_1_right_leg_0(num_envs=args_cli.num_envs)
             #actions = both_legs_1(num_envs=args_cli.num_envs)
-            #actions = both_legs_0(num_envs=args_cli.num_envs)
+            actions = both_legs_0(num_envs=args_cli.num_envs)
             # actions = both_legs_theta(theta=0.3, num_envs=args_cli.num_envs)
             # if count % env.max_episode_length <= 150:
             #     actions = both_legs_theta(theta=5, num_envs=args_cli.num_envs)
