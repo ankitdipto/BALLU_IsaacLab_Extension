@@ -53,8 +53,8 @@ except Exception as exc:
 # ==============================================================================
 
 PARAMETER_RANGES = {
-    "femur_length": (0.30, 0.50, 0.36501),      # Upper leg length (m)
-    "tibia_length": (0.25, 0.45, 0.32000),      # Lower leg length (m)
+    "femur_length": (0.20, 0.30, 0.36501),      # Upper leg length (m)
+    "tibia_length": (0.20, 0.30, 0.32000),      # Lower leg length (m)
     "hip_width": (0.08, 0.15, 0.11605),         # Hip joint spacing (m)
     "balloon_radius": (0.25, 0.40, 0.32000),    # Buoyancy cylinder radius (m)
     "balloon_height": (0.60, 0.85, 0.70000),    # Buoyancy cylinder height (m)
