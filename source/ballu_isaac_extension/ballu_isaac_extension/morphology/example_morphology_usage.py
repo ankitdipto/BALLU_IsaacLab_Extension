@@ -11,7 +11,7 @@ This script shows how to:
 6. Access parameter ranges
 """
 
-from ballu_morphology_config import (
+from .ballu_morphology_config import (
     BalluMorphology,
     GeometryParams,
     MassParams,

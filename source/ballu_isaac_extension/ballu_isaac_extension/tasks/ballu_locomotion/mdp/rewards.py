@@ -164,6 +164,48 @@ def position_tracking_l2_singleObj(
         rew = rew * (env.rsl_rl_iteration - begin_iter) / ramp_width
     return rew
 
+def position_tracking_l2_ramp(
+    env: ManagerBasedRLEnv,
+    asset_cfg: SceneEntityCfg = SceneEntityCfg("robot"),
+    begin_iter: int | None = None,
+    ramp_width: int | None = None,
+) -> torch.Tensor:
+    """Reward progress toward the ramp goal at x = 2.5 m (env frame).
+
+    Identical in structure to :func:`position_tracking_l2_singleObj` but the
+    goal is placed 2.5 m ahead of each env's origin (0.5 m beyond ramp end).
+
+    Args:
+        env: The learning environment.
+        asset_cfg: Robot articulation scene entity.
+        begin_iter: PPO iteration at which the reward activates.  Zero reward
+            is returned before this point.
+        ramp_width: Number of iterations over which the reward is linearly
+            ramped from 0 to full weight after ``begin_iter``.
+
+    Returns:
+        Per-environment reward tensor of shape ``(num_envs,)``.
+    """
+    if begin_iter is not None and env.rsl_rl_iteration < begin_iter:
+        return torch.zeros(env.num_envs, device=env.device, dtype=torch.float32)
+
+    asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]
+    env_origins = env.scene.env_origins
+    goal_pos_w = env_origins[:, :2] + torch.tensor(
+        [2.5, 0.0], device=env.device, dtype=env_origins.dtype
+    )
+    motor_arm_ids, _ = asset.find_bodies("MOTORARM_(LEFT|RIGHT)")
+    motorarm_pos_w_XY = asset.data.body_link_pos_w[:, motor_arm_ids, :2]
+    mean_motorarm_pos_w_XY = motorarm_pos_w_XY.mean(dim=1)
+    error = torch.norm(goal_pos_w - mean_motorarm_pos_w_XY, p=2, dim=1)
+    rew = 1.0 - 0.40 * error
+    rew = torch.nan_to_num(rew, nan=0.0)
+    rew = torch.clip(rew, min=-2.0)
+    if ramp_width is not None and env.rsl_rl_iteration < begin_iter + ramp_width:
+        rew = rew * (env.rsl_rl_iteration - begin_iter) / ramp_width
+    return rew
+
+
 def goal_reached_bonus(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
     """Reward goal reached."""
     asset: RigidObjectSpawnerCfg = env.scene[asset_cfg.name]

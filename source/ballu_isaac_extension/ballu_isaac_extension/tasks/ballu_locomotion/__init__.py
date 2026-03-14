@@ -207,3 +207,13 @@ gym.register(
         "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSoftMoEPPORunnerCfg"
     }
 )
+
+gym.register(
+    id="Isc-BALLU-ramp-locomotion",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.single_ramp_env_cfg:BalluSingleRampEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUPPORunnerCfg"
+    }
+)

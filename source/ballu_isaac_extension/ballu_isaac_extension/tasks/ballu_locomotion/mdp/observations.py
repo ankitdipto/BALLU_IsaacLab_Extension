@@ -86,6 +86,26 @@ def goal_location_w_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
     assert goal_pos_w.shape == (env.num_envs, 2), f"Goal position shape mismatch, expected (num_envs, 2), got {goal_pos_w.shape}"
     return goal_pos_w
 
+def goal_location_ramp_w_priv(env: ManagerBasedRLEnv) -> torch.Tensor:
+    """Goal location for ramp locomotion task (x = 2.5 m in env frame).
+
+    The goal is an imaginary waypoint 0.5 m beyond the end of the ramp
+    (ramp ends at x = 2.0 m, goal at x = 2.5 m).  Returned in env frame,
+    i.e. relative to each env's origin (always [2.5, 0.0]).
+    """
+    env_origins = env.scene.env_origins
+    goal_pos_w = (
+        env_origins[:, :2]
+        + torch.tensor([2.5, 0.0], device=env.device, dtype=env_origins.dtype)
+    )
+    goal_pos_env = goal_pos_w - env_origins[:, :2]
+    assert goal_pos_env.shape == (env.num_envs, 2), (
+        f"Goal position shape mismatch, expected ({env.num_envs}, 2), "
+        f"got {goal_pos_env.shape}"
+    )
+    return goal_pos_env
+
+
 def generated_spring_coeff(env: ManagerBasedRLEnv, low: float = 1e-3, high: float = 1e-2) -> torch.Tensor:
     """Generated spring coefficient"""
     # extract the used quantities (to enable type-hinting)
