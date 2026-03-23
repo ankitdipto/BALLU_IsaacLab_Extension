@@ -17,13 +17,16 @@ Usage:
     python train.py --task Isc-Vel-BALLU-1-obstacle-hetero-dynamic
 """
 
+import json as _json
 import math
+import os as _os
 
 from ballu_isaac_extension.ballu_assets.ballu_config import (
     get_ballu_hetero_cfg_dynamic,
     has_dynamic_morphology_support,
     BALLU_REAL_CFG
 )
+from ballu_isaac_extension.ballu_assets.morphology_loader import create_hetero_config
 import ballu_isaac_extension.tasks.ballu_locomotion.mdp as mdp
 
 from isaaclab.assets import ArticulationCfg, AssetBaseCfg
@@ -281,30 +284,66 @@ class BalluSingleObstacleHeteroDynamicEnvCfg(ManagerBasedRLEnvCfg):
 
     # Post initialization
     def __post_init__(self) -> None:
-        """Post initialization."""
-        # Check if dynamic loading is available
-        if not has_dynamic_morphology_support():
-            raise ImportError(
-                "Dynamic morphology loading not available. "
-                "Ensure morphology_loader.py is installed."
-            )
-        
-        self.morphology_library_name = "hetero_library_hvyBloon_lab01.20.26"
-        # self.morphology_library_name = "test_library"
-        self.max_morphologies = None # None = load all morphologies
-        # Load robot configuration dynamically
-        print(f"\n{'='*80}")
-        print(f"Loading dynamic heterogeneous morphology configuration")
-        print(f"Library: {self.morphology_library_name}")
-        print(f"Max morphologies: {self.max_morphologies if self.max_morphologies else 'ALL'}")
-        print(f"{'='*80}\n")
-        
-        self.scene.robot = get_ballu_hetero_cfg_dynamic(
-            library_name=self.morphology_library_name,
-            max_morphologies=self.max_morphologies,
-            spring_damping=0.001,
-            init_pos = (0.0, 0.0, 1.2)
-        ).replace(prim_path="{ENV_REGEX_NS}/Robot")
+        """Post initialization.
+
+        Two modes:
+        - BALLU_USD_ORDER_FILE set (3D PEC mode): reads an ordered JSON list of
+          USD paths; env i → usd_paths[i].  Used during PEC training and eval so
+          each parallel environment gets its designated design.
+        - Otherwise (legacy library mode): loads a full morphology library via
+          get_ballu_hetero_cfg_dynamic.
+        """
+        order_file = _os.environ.get("BALLU_USD_ORDER_FILE")
+
+        if order_file:
+            # 3D PEC mode: deterministic per-env USD assignment.
+            with open(order_file) as f:
+                usd_paths = _json.load(f)
+
+            morphologies = [{"usd_path": p} for p in usd_paths]
+            self.scene.robot = create_hetero_config(
+                morphologies=morphologies,
+                spring_coeff=0.0807,
+                spring_damping=0.001,
+                pd_p=1.00,
+                pd_d=0.08,
+                init_pos=(0.0, 0.0, 1.2),
+                random_choice=False,
+            ).replace(prim_path="{ENV_REGEX_NS}/Robot")
+
+            print(f"\n{'='*80}")
+            print(f"BALLU_USD_ORDER_FILE mode: {len(usd_paths)} ordered USD(s) loaded")
+            print(f"  File: {order_file}")
+            print(f"{'='*80}\n")
+
+        else:
+            # Legacy library-based mode.
+            if not has_dynamic_morphology_support():
+                raise ImportError(
+                    "Dynamic morphology loading not available. "
+                    "Ensure morphology_loader.py is installed."
+                )
+
+            self.morphology_library_name = "hetero_library_hvyBloon_lab01.20.26"
+            # self.morphology_library_name = "test_library"
+            self.max_morphologies = None  # None = load all morphologies
+
+            print(f"\n{'='*80}")
+            print(f"Loading dynamic heterogeneous morphology configuration")
+            print(f"Library: {self.morphology_library_name}")
+            print(f"Max morphologies: {self.max_morphologies if self.max_morphologies else 'ALL'}")
+            print(f"{'='*80}\n")
+
+            self.scene.robot = get_ballu_hetero_cfg_dynamic(
+                library_name=self.morphology_library_name,
+                max_morphologies=self.max_morphologies,
+                spring_coeff=0.0807,
+                spring_damping=0.001,
+                pd_p=1.00,
+                pd_d=0.08,
+                init_pos=(0.0, 0.0, 1.2),
+                random_choice=True,
+            ).replace(prim_path="{ENV_REGEX_NS}/Robot")
         
         # general settings
         self.decimation = 10
