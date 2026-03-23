@@ -49,7 +49,7 @@ def run_evaluation_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/03.17.2026/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/03.31.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
@@ -119,7 +119,7 @@ def run_testing_experiment(
     ]
 
     env = os.environ.copy()
-    env['BALLU_USD_REL_PATH'] = f"morphologies/03.17.2026/{morph_id}/{morph_id}.usd"
+    env['BALLU_USD_REL_PATH'] = f"morphologies/03.31.2026/{morph_id}/{morph_id}.usd"
     env['ISAAC_SIM_PYTHON_EXE'] = sys.executable
     env['FORCE_GPU'] = '1'
 
