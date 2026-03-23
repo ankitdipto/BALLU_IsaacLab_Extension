@@ -154,10 +154,14 @@ def compute_coverage(state: dict, n_mc: int = 10_000) -> float:
     unnormalised density exceeds exp(-2) ≈ 0.135 (≈ 2-sigma radius).
 
     Mirrors the logic in ``pec_refit_gaussians.coverage_estimate``.
+    Handles both 2D (GCR, spcf) and 3D (GCR, spcf, leg) design spaces.
     """
     experts  = state["experts"]
     gcr_lo,  gcr_hi  = state["design_space"]["GCR"]
     spcf_lo, spcf_hi = state["design_space"]["spcf"]
+    is_3d = "leg" in state["design_space"]
+    if is_3d:
+        leg_lo, leg_hi = state["design_space"]["leg"]
     threshold = math.exp(-2.0)
     rng = random.Random(0)
 
@@ -165,14 +169,22 @@ def compute_coverage(state: dict, n_mc: int = 10_000) -> float:
     for _ in range(n_mc):
         g = rng.uniform(gcr_lo, gcr_hi)
         s = rng.uniform(spcf_lo, spcf_hi)
+        if is_3d:
+            l = rng.uniform(leg_lo, leg_hi)
         for ex in experts:
             mu    = ex["mu"]
             sigma = ex["sigma"]
             d_g   = (g - mu[0]) ** 2 / (2.0 * sigma[0][0])
             d_s   = (s - mu[1]) ** 2 / (2.0 * sigma[1][1])
-            if math.exp(-(d_g + d_s)) > threshold:
-                covered += 1
-                break
+            if is_3d:
+                d_l = (l - mu[2]) ** 2 / (2.0 * sigma[2][2])
+                if math.exp(-(d_g + d_s + d_l)) > threshold:
+                    covered += 1
+                    break
+            else:
+                if math.exp(-(d_g + d_s)) > threshold:
+                    covered += 1
+                    break
     return covered / n_mc
 
 
@@ -212,6 +224,8 @@ def step_init(run_name: str, config: dict, overwrite: bool) -> int:
         "--seed",        config.get("seed", 42),
         "--log_root",    config.get("log_root", "logs/pec"),
     ]
+    if config.get("leg_range") is not None:
+        args += ["--leg_range"] + [str(v) for v in config["leg_range"]]
     if config.get("init_strategy") is not None:
         args += ["--init_strategy", config["init_strategy"]]
     if config.get("init_seed") is not None:
@@ -363,19 +377,35 @@ def step_visualize(run_name: str, pec_iter: int, config: dict) -> None:
 
 def print_iteration_summary(state: dict, pec_iter: int, coverage: float,
                             coverage_target: float) -> None:
+    is_3d = "leg" in state["design_space"]
     print(f"\n{'=' * 70}")
     print(f"  PEC Iteration {pec_iter} complete  "
           f"(state iteration → {state['iteration']})")
     print(f"  MC coverage : {coverage * 100:.1f}%  "
           f"(target {coverage_target * 100:.0f}%)")
-    print(f"\n  {'Expert':>7}  {'mu_GCR':>8}  {'mu_spcf':>9}  "
-          f"{'σ_GCR':>7}  {'σ_spcf':>8}  {'n_designs':>9}  checkpoint")
-    for ex in state["experts"]:
-        std_g = math.sqrt(ex["sigma"][0][0])
-        std_s = math.sqrt(ex["sigma"][1][1])
-        ckpt  = os.path.basename(ex.get("checkpoint") or "N/A")
-        print(f"  {ex['id']:>7}  {ex['mu'][0]:>8.4f}  {ex['mu'][1]:>9.5f}  "
-              f"{std_g:>7.4f}  {std_s:>8.5f}  {len(ex['designs']):>9}  {ckpt}")
+    if is_3d:
+        print(f"\n  {'Expert':>7}  {'mu_GCR':>8}  {'mu_spcf':>9}  {'mu_leg':>7}  "
+              f"{'σ_GCR':>7}  {'σ_spcf':>8}  {'σ_leg':>6}  {'n_designs':>9}  checkpoint")
+        for ex in state["experts"]:
+            std_g = math.sqrt(ex["sigma"][0][0])
+            std_s = math.sqrt(ex["sigma"][1][1])
+            std_l = math.sqrt(ex["sigma"][2][2])
+            _ckpt = ex.get("checkpoint")
+            ckpt  = os.path.basename(_ckpt) if _ckpt else "N/A"
+            print(f"  {ex['id']:>7}  {ex['mu'][0]:>8.4f}  {ex['mu'][1]:>9.5f}  "
+                  f"{ex['mu'][2]:>7.4f}  "
+                  f"{std_g:>7.4f}  {std_s:>8.5f}  {std_l:>6.4f}  "
+                  f"{len(ex['designs']):>9}  {ckpt}")
+    else:
+        print(f"\n  {'Expert':>7}  {'mu_GCR':>8}  {'mu_spcf':>9}  "
+              f"{'σ_GCR':>7}  {'σ_spcf':>8}  {'n_designs':>9}  checkpoint")
+        for ex in state["experts"]:
+            std_g = math.sqrt(ex["sigma"][0][0])
+            std_s = math.sqrt(ex["sigma"][1][1])
+            _ckpt = ex.get("checkpoint")
+            ckpt  = os.path.basename(_ckpt) if _ckpt else "N/A"
+            print(f"  {ex['id']:>7}  {ex['mu'][0]:>8.4f}  {ex['mu'][1]:>9.5f}  "
+                  f"{std_g:>7.4f}  {std_s:>8.5f}  {len(ex['designs']):>9}  {ckpt}")
     print(f"{'=' * 70}\n")
 
 
@@ -432,6 +462,10 @@ def main():
                         help="Override init_anchor_region from the config file.")
     parser.add_argument("--target_init_coverage", type=float, default=None,
                         help="Override target_init_coverage from the config file.")
+    parser.add_argument("--leg_range", type=float, nargs=2, default=None,
+                        metavar=("LEG_LO", "LEG_HI"),
+                        help="Override leg_range [lo hi] from the config file "
+                             "(enables 3D PEC over GCR × spcf × leg_length).")
     parser.add_argument("--overwrite", action="store_true",
                         help="Force re-initialisation even if pec_state.json "
                              "already exists (passes --overwrite to pec_init.py).")
@@ -455,6 +489,8 @@ def main():
         config["init_anchor_region"] = args.init_anchor_region
     if args.target_init_coverage is not None:
         config["target_init_coverage"] = args.target_init_coverage
+    if args.leg_range is not None:
+        config["leg_range"] = args.leg_range
 
     log_root           = config.get("log_root", "logs/pec")
     run_dir            = os.path.join(log_root, args.run_name)

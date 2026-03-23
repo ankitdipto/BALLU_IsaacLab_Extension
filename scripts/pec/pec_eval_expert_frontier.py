@@ -119,6 +119,7 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
 
     gcr_values  = [c["GCR"]  for c in candidates]
     spcf_values = [c["spcf"] for c in candidates]
+    # leg values are handled via BALLU_USD_ORDER_FILE (set by the parent orchestrator)
 
     print(f"\n{'='*70}")
     print(f"  PEC Frontier Eval — expert checkpoint:")
@@ -207,13 +208,16 @@ def main(env_cfg: ManagerBasedRLEnvCfg | DirectRLEnvCfg | DirectMARLEnvCfg,
     results = []
     for i, cand in enumerate(candidates):
         lvl = int(final_level_idx_cpu[i])
-        results.append({
+        entry = {
             "id":             cand["id"],
             "GCR":            cand["GCR"],
             "spcf":           cand["spcf"],
             "best_level_idx": lvl,
             "best_height_m":  float(obstacle_height_list[lvl]),
-        })
+        }
+        if "leg" in cand:
+            entry["leg"] = cand["leg"]
+        results.append(entry)
 
     output_payload = {
         "checkpoint": args_cli.checkpoint_path,
