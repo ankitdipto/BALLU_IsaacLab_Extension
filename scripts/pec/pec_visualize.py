@@ -1,20 +1,23 @@
 """
 PEC Gaussian Mixture Visualizer
 =================================
-Plots the K expert Gaussians in the 2D (spcf, GCR) design space.
+Plots the K expert Gaussians in the design space.
 
-Layout
-------
-- Background heatmap: dominant expert at each grid point (argmax of
-  unnormalized Gaussian density), fading to white in uncovered regions.
-- 1σ and 2σ iso-density ellipses for every expert.
-- Training design points accumulated by each expert (circles).
-- If --itr is given and frontier_evals/iter_<N>/scores.json exists:
-    - Frontier candidate designs (stars), color = winning expert,
-      gray = all experts tied at 0.
-    - Score labels (best curriculum level) next to each candidate.
+2D mode (GCR × spcf)
+---------------------
+- Single plot: background heatmap + 1σ/2σ ellipses + training designs.
+- If --itr is given and frontier scores exist: frontier overlay.
+- Axes: X = spcf,  Y = GCR.
 
-Axes: X = spcf,  Y = GCR  (as requested).
+3D mode (GCR × spcf × leg)
+----------------------------
+- Three 2D marginal subplots in one figure:
+    1. GCR vs spcf  (X = spcf,  Y = GCR)
+    2. GCR vs leg   (X = leg,   Y = GCR)
+    3. spcf vs leg  (X = leg,   Y = spcf)
+- Each subplot shows the 2D marginal Gaussian (diagonal covariance → axis-aligned
+  ellipse) with heatmap, training designs projected onto the 2 axes, and optional
+  frontier overlay.
 
 Usage (run from ballu_isclb_extension/)
 -----------------------------------------
@@ -68,15 +71,22 @@ def _expert_color(kid: int) -> str:
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _log_density_grid(mu, sigma, spcf_grid, gcr_grid):
-    """Unnormalised log-density at every point of a 2D meshgrid."""
+    """Unnormalised 2D log-density for the original (GCR, spcf) plane."""
     d_gcr  = (gcr_grid  - mu[0]) ** 2 / (2.0 * sigma[0][0])
     d_spcf = (spcf_grid - mu[1]) ** 2 / (2.0 * sigma[1][1])
     return -(d_gcr + d_spcf)
 
 
+def _log_density_grid_marginal(mu_x, var_x, mu_y, var_y, X_grid, Y_grid):
+    """Unnormalised 2D log-density for any marginal pair (diagonal covariance)."""
+    d_x = (X_grid - mu_x) ** 2 / (2.0 * var_x)
+    d_y = (Y_grid - mu_y) ** 2 / (2.0 * var_y)
+    return -(d_x + d_y)
+
+
 def _ellipse_patch(mu, sigma, n_sigma: float, color, linestyle="-", lw=1.5,
                    label=None):
-    """Return a matplotlib Ellipse patch for the n-sigma iso-density contour."""
+    """Return a matplotlib Ellipse patch for the 2D (GCR, spcf) plane."""
     std_gcr  = math.sqrt(sigma[0][0])
     std_spcf = math.sqrt(sigma[1][1])
     # Width along X (spcf), height along Y (GCR)
@@ -94,13 +104,171 @@ def _ellipse_patch(mu, sigma, n_sigma: float, color, linestyle="-", lw=1.5,
     )
 
 
+def _ellipse_patch_marginal(mu_x, std_x, mu_y, std_y, n_sigma: float,
+                             color, linestyle="-", lw=1.5):
+    """Return a matplotlib Ellipse patch for a generic 2D marginal plane."""
+    return Ellipse(
+        xy=(mu_x, mu_y),
+        width=2 * n_sigma * std_x,
+        height=2 * n_sigma * std_y,
+        angle=0,
+        edgecolor=color,
+        facecolor="none",
+        linestyle=linestyle,
+        linewidth=lw,
+        zorder=4,
+    )
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# 2D subplot renderer (used by 3D mode for each marginal pair)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _render_marginal_subplot(
+    ax,
+    experts,
+    ix: int, iy: int,             # design-space dimension indices for X and Y axes
+    x_lo: float, x_hi: float,
+    y_lo: float, y_hi: float,
+    x_label: str, y_label: str,
+    grid_res: int,
+    log_thresh: float,
+    no_2sigma: bool,
+    frontier_data,                # loaded scores JSON or None
+    itr,                          # for annotation title
+):
+    """
+    Render one 2D marginal subplot.
+
+    ix / iy are indices into the 3-element design vector [GCR, spcf, leg]:
+      0 = GCR, 1 = spcf, 2 = leg
+    X axis = dimension ix,  Y axis = dimension iy.
+    """
+    x_vals = np.linspace(x_lo, x_hi, grid_res)
+    y_vals = np.linspace(y_lo, y_hi, grid_res)
+    X_grid, Y_grid = np.meshgrid(x_vals, y_vals)
+
+    # Per-expert 2D marginal log-density.
+    log_dens = np.stack([
+        _log_density_grid_marginal(
+            ex["mu"][ix], ex["sigma"][ix][ix],
+            ex["mu"][iy], ex["sigma"][iy][iy],
+            X_grid, Y_grid,
+        )
+        for ex in experts
+    ], axis=0)   # (K, R, R)
+
+    dominant = np.argmax(log_dens, axis=0)
+    max_log  = np.max(log_dens, axis=0)
+    covered  = max_log > log_thresh
+
+    img = np.ones((grid_res, grid_res, 4))
+    for kid, ex in enumerate(experts):
+        r, g, b = matplotlib.colors.to_rgb(_expert_color(kid))
+        mask  = (dominant == kid) & covered
+        alpha = np.clip(
+            0.15 + 0.40 * (max_log - log_thresh) / (-log_thresh), 0.0, 0.55
+        )
+        img[mask, 0] = r
+        img[mask, 1] = g
+        img[mask, 2] = b
+        img[mask, 3] = alpha[mask]
+
+    ax.set_facecolor("white")
+    ax.imshow(
+        img,
+        extent=[x_lo, x_hi, y_lo, y_hi],
+        aspect="auto",
+        origin="lower",
+        interpolation="bilinear",
+        zorder=0,
+    )
+    ax.add_patch(mpatches.Rectangle(
+        (x_lo, y_lo), x_hi - x_lo, y_hi - y_lo,
+        linewidth=1.5, edgecolor="black", facecolor="none", zorder=1,
+    ))
+
+    for ex in experts:
+        kid   = ex["id"]
+        color = _expert_color(kid)
+        mu_x  = ex["mu"][ix]
+        mu_y  = ex["mu"][iy]
+        std_x = math.sqrt(ex["sigma"][ix][ix])
+        std_y = math.sqrt(ex["sigma"][iy][iy])
+
+        # 1σ ellipse
+        ax.add_patch(_ellipse_patch_marginal(mu_x, std_x, mu_y, std_y,
+                                             1.0, color, "-", 2.0))
+        # 2σ ellipse
+        if not no_2sigma:
+            ax.add_patch(_ellipse_patch_marginal(mu_x, std_x, mu_y, std_y,
+                                                 2.0, color, "--", 1.2))
+        # Center cross
+        ax.plot(mu_x, mu_y, "+", color=color, ms=12, mew=2.5, zorder=5)
+
+        # Training design points projected to (ix, iy) axes.
+        designs = ex.get("designs", [])
+        if designs:
+            d_arr = np.array(designs)
+            ax.scatter(d_arr[:, ix], d_arr[:, iy],
+                       s=18, color=color, alpha=0.6,
+                       edgecolors="white", linewidths=0.4,
+                       zorder=3, marker="o")
+
+    # Frontier overlay
+    if frontier_data is not None:
+        candidates   = frontier_data["candidates"]
+        scores_mat   = {int(k): v for k, v in
+                        frontier_data["scores_matrix"].items()}
+        valid_experts = [kid for kid, s in scores_mat.items() if s is not None]
+
+        for cand in candidates:
+            fid    = cand["id"]
+            coords = [cand["GCR"], cand["spcf"], cand.get("leg", 0.0)]
+            x_val  = coords[ix]
+            y_val  = coords[iy]
+
+            best_score = -1
+            winner     = None
+            for kid in valid_experts:
+                sc = scores_mat[kid][fid]
+                if sc > best_score:
+                    best_score = sc
+                    winner     = kid
+
+            color = _expert_color(winner) if winner is not None and best_score > 0 \
+                    else "#aaaaaa"
+
+            ax.scatter(x_val, y_val, s=80, color=color,
+                       marker="*", edgecolors="black", linewidths=0.5,
+                       zorder=6, alpha=0.9)
+
+            if best_score > 0:
+                ax.annotate(
+                    str(best_score),
+                    xy=(x_val, y_val),
+                    xytext=(3, 3), textcoords="offset points",
+                    fontsize=6.5, color=color, zorder=7,
+                )
+
+    ax.set_xlim(x_lo, x_hi)
+    ax.set_ylim(y_lo, y_hi)
+    ax.set_xlabel(x_label, fontsize=10)
+    ax.set_ylabel(y_label, fontsize=10)
+
+    # Format x-tick labels with enough decimal places for spcf.
+    if x_hi - x_lo < 0.5:
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.4f"))
+        ax.tick_params(axis="x", rotation=30)
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
 # ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Visualise PEC Gaussian mixture in the (spcf, GCR) plane."
+        description="Visualise PEC Gaussian mixture in the design space."
     )
     parser.add_argument("--run_name",  type=str, required=True,
                         help="PEC run name (matches pec_init.py).")
@@ -142,26 +310,24 @@ def main():
 
     gcr_lo,  gcr_hi  = state["design_space"]["GCR"]
     spcf_lo, spcf_hi = state["design_space"]["spcf"]
-    cur_iter  = state["iteration"]
+    is_3d    = "leg" in state["design_space"]
+    cur_iter = state["iteration"]
+
+    if is_3d:
+        leg_lo, leg_hi = state["design_space"]["leg"]
 
     log_thresh = args.coverage_threshold if args.coverage_threshold is not None \
                  else -2.0    # exp(-2) ≈ 0.135
 
     # ── Resolve which Gaussian parameters to plot ─────────────────────────────
-    # If --itr is given and a history snapshot exists for that iteration, use
-    # the Gaussians that were active at that time.  Otherwise use current state.
     if args.itr is not None:
         history = state.get("history", [])
         snap = next((h for h in history if h["iteration"] == args.itr), None)
         if snap is not None:
-            # Reconstruct expert dicts from snapshot (add designs from current
-            # state so training-design dots still render).
             current_by_id = {ex["id"]: ex for ex in state["experts"]}
             experts = []
             for s in snap["experts_snapshot"]:
                 ex = dict(s)
-                # Show only the designs that existed at this iteration
-                # (n_designs is the count at snapshot time).
                 cur_designs = current_by_id.get(s["id"], {}).get("designs", [])
                 ex["designs"] = cur_designs[: s["n_designs"]]
                 experts.append(ex)
@@ -196,169 +362,238 @@ def main():
         print(f"[INFO] --no_frontier: Gaussian state at iter "
               f"{args.itr} shown without frontier overlay.")
 
-    # ── Build background heatmap ──────────────────────────────────────────────
-    spcf_vals = np.linspace(spcf_lo, spcf_hi, args.grid_res)
-    gcr_vals  = np.linspace(gcr_lo,  gcr_hi,  args.grid_res)
-    SPCF, GCR = np.meshgrid(spcf_vals, gcr_vals)   # (R, R) each
-
-    # Per-expert log-density at every grid point.
-    log_dens = np.stack([
-        _log_density_grid(ex["mu"], ex["sigma"], SPCF, GCR)
-        for ex in experts
-    ], axis=0)   # (K, R, R)
-
-    dominant = np.argmax(log_dens, axis=0)          # (R, R)  expert index
-    max_log  = np.max(log_dens, axis=0)             # (R, R)
-
-    # Coverage mask: True where at least one expert has density > threshold.
-    covered = max_log > log_thresh                   # (R, R)
-
-    # Build RGBA image: each pixel = expert colour, alpha ∝ coverage strength.
-    # In uncovered regions, alpha = 0 (transparent → white background).
-    img = np.ones((args.grid_res, args.grid_res, 4))   # white RGBA
-    for kid, ex in enumerate(experts):
-        r, g, b = matplotlib.colors.to_rgb(_expert_color(kid))
-        mask = (dominant == kid) & covered
-        # Alpha: linearly maps log-density [log_thresh, 0] → [0.15, 0.55]
-        alpha = np.clip(
-            0.15 + 0.40 * (max_log - log_thresh) / (-log_thresh),
-            0.0, 0.55
-        )
-        img[mask, 0] = r
-        img[mask, 1] = g
-        img[mask, 2] = b
-        img[mask, 3] = alpha[mask]
-
-    # ── Figure ────────────────────────────────────────────────────────────────
-    fig, ax = plt.subplots(figsize=(8, 7))
-    ax.set_facecolor("white")
-
-    # Background heatmap
-    ax.imshow(
-        img,
-        extent=[spcf_lo, spcf_hi, gcr_lo, gcr_hi],
-        aspect="auto",
-        origin="lower",
-        interpolation="bilinear",
-        zorder=0,
-    )
-
-    # Design-space boundary
-    ax.add_patch(mpatches.Rectangle(
-        (spcf_lo, gcr_lo),
-        spcf_hi - spcf_lo, gcr_hi - gcr_lo,
-        linewidth=1.5, edgecolor="black", facecolor="none", zorder=1,
-    ))
-
-    legend_handles = []
-
-    for ex in experts:
-        kid   = ex["id"]
-        color = _expert_color(kid)
-        mu_gcr, mu_spcf = ex["mu"][0], ex["mu"][1]
-
-        # 1σ ellipse (solid)
-        ax.add_patch(_ellipse_patch(ex["mu"], ex["sigma"], 1.0, color,
-                                    linestyle="-",  lw=2.0))
-        # 2σ ellipse (dashed) — skipped when --no_2sigma is set
-        if not args.no_2sigma:
-            ax.add_patch(_ellipse_patch(ex["mu"], ex["sigma"], 2.0, color,
-                                        linestyle="--", lw=1.2))
-
-        # Center cross
-        ax.plot(mu_spcf, mu_gcr, "+", color=color, ms=12, mew=2.5, zorder=5)
-
-        # Training design points
-        designs = ex.get("designs", [])
-        if designs:
-            d_arr = np.array(designs)   # (N, 2): col0=GCR, col1=spcf
-            ax.scatter(d_arr[:, 1], d_arr[:, 0],
-                       s=18, color=color, alpha=0.6,
-                       edgecolors="white", linewidths=0.4,
-                       zorder=3, marker="o")
-
-        legend_handles.append(Line2D(
-            [], [], color=color, marker="o", linestyle="-",
-            markersize=7, label=f"Expert {kid}  μ=({mu_gcr:.3f}, {mu_spcf:.5f})"
-        ))
-
-    # ── Frontier overlay ──────────────────────────────────────────────────────
-    if frontier_data is not None:
-        candidates   = frontier_data["candidates"]
-        scores_mat   = {int(k): v for k, v in
-                        frontier_data["scores_matrix"].items()}
-        valid_experts = [kid for kid, s in scores_mat.items() if s is not None]
-
-        for cand in candidates:
-            fid   = cand["id"]
-            g_val = cand["GCR"]
-            s_val = cand["spcf"]
-
-            # Find winner
-            best_score = -1
-            winner     = None
-            for kid in valid_experts:
-                sc = scores_mat[kid][fid]
-                if sc > best_score:
-                    best_score = sc
-                    winner     = kid
-
-            color = _expert_color(winner) if winner is not None and best_score > 0 \
-                    else "#aaaaaa"
-
-            ax.scatter(s_val, g_val, s=80, color=color,
-                       marker="*", edgecolors="black", linewidths=0.5,
-                       zorder=6, alpha=0.9)
-
-            if best_score > 0:
-                ax.annotate(
-                    str(best_score),
-                    xy=(s_val, g_val),
-                    xytext=(3, 3), textcoords="offset points",
-                    fontsize=6.5, color=color, zorder=7,
-                )
-
-        legend_handles += [
-            Line2D([], [], color="#555555", marker="*", linestyle="none",
-                   markersize=9, markeredgecolor="black",
-                   label=f"Frontier iter {args.itr}  (★ = winner, ✦ = tied at 0)"),
-        ]
-
-    # ── Labels / cosmetics ────────────────────────────────────────────────────
+    # ── Title suffix ──────────────────────────────────────────────────────────
     if args.itr is not None and not args.no_frontier:
         title_itr = f"  |  iter {args.itr} frontier overlay"
     elif args.itr is not None:
         title_itr = f"  |  Gaussian state at iter {args.itr}"
     else:
         title_itr = f"  |  current state (iter {cur_iter})"
-    ax.set_title(f"PEC Gaussian Mixture — {args.run_name}{title_itr}",
-                 fontsize=11, pad=10)
-    ax.set_xlabel("Spring Coefficient  (spcf)", fontsize=11)
-    ax.set_ylabel("Gravity Compensation Ratio  (GCR)", fontsize=11)
 
-    ax.set_xlim(spcf_lo, spcf_hi)
-    ax.set_ylim(gcr_lo,  gcr_hi)
+    # ── Shared legend handles (built once, attached to last subplot or fig) ───
+    def _build_legend_handles(with_frontier: bool) -> list:
+        handles = []
+        for ex in experts:
+            kid   = ex["id"]
+            color = _expert_color(kid)
+            mu    = ex["mu"]
+            if is_3d:
+                label = (f"Expert {kid}  "
+                         f"μ=({mu[0]:.3f}, {mu[1]:.5f}, {mu[2]:.3f})")
+            else:
+                label = f"Expert {kid}  μ=({mu[0]:.3f}, {mu[1]:.5f})"
+            handles.append(Line2D(
+                [], [], color=color, marker="o", linestyle="-",
+                markersize=7, label=label,
+            ))
+        handles.append(Line2D([], [], color="black", linestyle="-",
+                              lw=2.0, label="1σ ellipse"))
+        if not args.no_2sigma:
+            handles.append(Line2D([], [], color="black", linestyle="--",
+                                  lw=1.2, label="2σ ellipse"))
+        handles.append(Line2D([], [], color="black", marker="o",
+                              linestyle="none", markersize=5,
+                              label="Training designs"))
+        if with_frontier:
+            handles.append(Line2D(
+                [], [], color="#555555", marker="*", linestyle="none",
+                markersize=9, markeredgecolor="black",
+                label=f"Frontier iter {args.itr}  (★ = winner, ✦ = tied at 0)"),
+            )
+        return handles
 
-    # Format spcf x-tick labels with 4 decimal places
-    ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.4f"))
-    ax.tick_params(axis="x", rotation=30)
+    # ═════════════════════════════════════════════════════════════════════════
+    # 2D mode — single plot (preserved exactly from original implementation)
+    # ═════════════════════════════════════════════════════════════════════════
+    if not is_3d:
+        spcf_vals = np.linspace(spcf_lo, spcf_hi, args.grid_res)
+        gcr_vals  = np.linspace(gcr_lo,  gcr_hi,  args.grid_res)
+        SPCF, GCR = np.meshgrid(spcf_vals, gcr_vals)
 
-    legend_handles.append(
-        Line2D([], [], color="black", linestyle="-", lw=2.0, label="1σ ellipse")
-    )
-    if not args.no_2sigma:
-        legend_handles.append(
-            Line2D([], [], color="black", linestyle="--", lw=1.2, label="2σ ellipse")
+        log_dens = np.stack([
+            _log_density_grid(ex["mu"], ex["sigma"], SPCF, GCR)
+            for ex in experts
+        ], axis=0)
+
+        dominant = np.argmax(log_dens, axis=0)
+        max_log  = np.max(log_dens, axis=0)
+        covered  = max_log > log_thresh
+
+        img = np.ones((args.grid_res, args.grid_res, 4))
+        for kid, ex in enumerate(experts):
+            r, g, b = matplotlib.colors.to_rgb(_expert_color(kid))
+            mask  = (dominant == kid) & covered
+            alpha = np.clip(
+                0.15 + 0.40 * (max_log - log_thresh) / (-log_thresh), 0.0, 0.55
+            )
+            img[mask, 0] = r
+            img[mask, 1] = g
+            img[mask, 2] = b
+            img[mask, 3] = alpha[mask]
+
+        fig, ax = plt.subplots(figsize=(8, 7))
+        ax.set_facecolor("white")
+
+        ax.imshow(
+            img,
+            extent=[spcf_lo, spcf_hi, gcr_lo, gcr_hi],
+            aspect="auto",
+            origin="lower",
+            interpolation="bilinear",
+            zorder=0,
         )
-    legend_handles.append(
-        Line2D([], [], color="black", marker="o", linestyle="none",
-               markersize=5, label="Training designs")
-    )
-    ax.legend(handles=legend_handles, loc="lower right",
-              fontsize=8.5, framealpha=0.85)
+        ax.add_patch(mpatches.Rectangle(
+            (spcf_lo, gcr_lo),
+            spcf_hi - spcf_lo, gcr_hi - gcr_lo,
+            linewidth=1.5, edgecolor="black", facecolor="none", zorder=1,
+        ))
 
-    plt.tight_layout()
+        legend_handles = []
+        for ex in experts:
+            kid   = ex["id"]
+            color = _expert_color(kid)
+            mu_gcr, mu_spcf = ex["mu"][0], ex["mu"][1]
 
+            ax.add_patch(_ellipse_patch(ex["mu"], ex["sigma"], 1.0, color,
+                                        linestyle="-",  lw=2.0))
+            if not args.no_2sigma:
+                ax.add_patch(_ellipse_patch(ex["mu"], ex["sigma"], 2.0, color,
+                                            linestyle="--", lw=1.2))
+
+            ax.plot(mu_spcf, mu_gcr, "+", color=color, ms=12, mew=2.5, zorder=5)
+
+            designs = ex.get("designs", [])
+            if designs:
+                d_arr = np.array(designs)
+                ax.scatter(d_arr[:, 1], d_arr[:, 0],
+                           s=18, color=color, alpha=0.6,
+                           edgecolors="white", linewidths=0.4,
+                           zorder=3, marker="o")
+
+            legend_handles.append(Line2D(
+                [], [], color=color, marker="o", linestyle="-",
+                markersize=7, label=f"Expert {kid}  μ=({mu_gcr:.3f}, {mu_spcf:.5f})"
+            ))
+
+        # Frontier overlay
+        if frontier_data is not None:
+            candidates   = frontier_data["candidates"]
+            scores_mat   = {int(k): v for k, v in
+                            frontier_data["scores_matrix"].items()}
+            valid_experts = [kid for kid, s in scores_mat.items() if s is not None]
+
+            for cand in candidates:
+                fid   = cand["id"]
+                g_val = cand["GCR"]
+                s_val = cand["spcf"]
+
+                best_score = -1
+                winner     = None
+                for kid in valid_experts:
+                    sc = scores_mat[kid][fid]
+                    if sc > best_score:
+                        best_score = sc
+                        winner     = kid
+
+                color = _expert_color(winner) if winner is not None and best_score > 0 \
+                        else "#aaaaaa"
+
+                ax.scatter(s_val, g_val, s=80, color=color,
+                           marker="*", edgecolors="black", linewidths=0.5,
+                           zorder=6, alpha=0.9)
+
+                if best_score > 0:
+                    ax.annotate(
+                        str(best_score),
+                        xy=(s_val, g_val),
+                        xytext=(3, 3), textcoords="offset points",
+                        fontsize=6.5, color=color, zorder=7,
+                    )
+
+            legend_handles += [
+                Line2D([], [], color="#555555", marker="*", linestyle="none",
+                       markersize=9, markeredgecolor="black",
+                       label=f"Frontier iter {args.itr}  (★ = winner, ✦ = tied at 0)"),
+            ]
+
+        ax.set_title(f"PEC Gaussian Mixture — {args.run_name}{title_itr}",
+                     fontsize=11, pad=10)
+        ax.set_xlabel("Spring Coefficient  (spcf)", fontsize=11)
+        ax.set_ylabel("Gravity Compensation Ratio  (GCR)", fontsize=11)
+        ax.set_xlim(spcf_lo, spcf_hi)
+        ax.set_ylim(gcr_lo,  gcr_hi)
+        ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.4f"))
+        ax.tick_params(axis="x", rotation=30)
+
+        legend_handles.append(
+            Line2D([], [], color="black", linestyle="-", lw=2.0, label="1σ ellipse")
+        )
+        if not args.no_2sigma:
+            legend_handles.append(
+                Line2D([], [], color="black", linestyle="--", lw=1.2, label="2σ ellipse")
+            )
+        legend_handles.append(
+            Line2D([], [], color="black", marker="o", linestyle="none",
+                   markersize=5, label="Training designs")
+        )
+        ax.legend(handles=legend_handles, loc="lower right",
+                  fontsize=8.5, framealpha=0.85)
+
+        plt.tight_layout()
+
+    # ═════════════════════════════════════════════════════════════════════════
+    # 3D mode — three pairwise 2D marginal subplots
+    # ═════════════════════════════════════════════════════════════════════════
+    else:
+        # Axis specs: (ix, iy, x_lo, x_hi, y_lo, y_hi, x_label, y_label)
+        subplot_specs = [
+            # GCR vs spcf: X=spcf (dim 1), Y=GCR (dim 0)
+            (1, 0, spcf_lo, spcf_hi, gcr_lo,  gcr_hi,
+             "Spring Coefficient (spcf)", "Gravity Compensation Ratio (GCR)"),
+            # GCR vs leg: X=leg (dim 2), Y=GCR (dim 0)
+            (2, 0, leg_lo,  leg_hi,  gcr_lo,  gcr_hi,
+             "Leg Length (leg)", "Gravity Compensation Ratio (GCR)"),
+            # spcf vs leg: X=leg (dim 2), Y=spcf (dim 1)
+            (2, 1, leg_lo,  leg_hi,  spcf_lo, spcf_hi,
+             "Leg Length (leg)", "Spring Coefficient (spcf)"),
+        ]
+        subplot_titles = [
+            "GCR × spcf (marginal)",
+            "GCR × leg (marginal)",
+            "spcf × leg (marginal)",
+        ]
+
+        fig, axes = plt.subplots(1, 3, figsize=(21, 6))
+        fig.suptitle(
+            f"PEC 3D Gaussian Mixture — {args.run_name}{title_itr}",
+            fontsize=12, y=1.01,
+        )
+
+        for ax, spec, sub_title in zip(axes, subplot_specs, subplot_titles):
+            ix, iy, x_lo, x_hi, y_lo, y_hi, x_lbl, y_lbl = spec
+            _render_marginal_subplot(
+                ax=ax,
+                experts=experts,
+                ix=ix, iy=iy,
+                x_lo=x_lo, x_hi=x_hi,
+                y_lo=y_lo, y_hi=y_hi,
+                x_label=x_lbl, y_label=y_lbl,
+                grid_res=args.grid_res,
+                log_thresh=log_thresh,
+                no_2sigma=args.no_2sigma,
+                frontier_data=frontier_data,
+                itr=args.itr,
+            )
+            ax.set_title(sub_title, fontsize=10)
+
+        # Shared legend on the last subplot.
+        legend_handles = _build_legend_handles(with_frontier=frontier_data is not None)
+        axes[-1].legend(handles=legend_handles, loc="lower right",
+                        fontsize=8, framealpha=0.85)
+
+        plt.tight_layout()
+
+    # ── Save or show ──────────────────────────────────────────────────────────
     if args.output:
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
         plt.savefig(args.output, dpi=150, bbox_inches="tight")

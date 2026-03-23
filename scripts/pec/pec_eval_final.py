@@ -7,9 +7,14 @@ Reads ``pec_state.json`` to discover the latest checkpoint for each expert,
 then calls ``pec_eval_expert_frontier.py`` once per expert (sequentially, one
 GPU process at a time) using the provided designs file as ``--frontier_file``.
 
-The designs file must be in the same JSON format produced by
-``pec_evaluate_frontier.py``:
-    [{\"id\": 0, \"GCR\": 0.82, \"spcf\": 0.005}, ...]
+The designs file format depends on the PEC mode:
+
+  2D mode: [{\"id\": 0, \"GCR\": 0.82, \"spcf\": 0.005}, ...]
+  3D mode: [{\"id\": 0, \"GCR\": 0.82, \"spcf\": 0.05, \"leg\": 0.35}, ...]
+
+In 3D mode, USDs are generated for all unique leg_lengths found in the designs
+file before evaluation begins.  ``BALLU_USD_ORDER_FILE`` is injected into each
+expert eval subprocess so env i evaluates exactly design i.
 
 Outputs
 -------
@@ -32,6 +37,7 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
 import time
 
 
@@ -39,9 +45,73 @@ import time
 # Paths
 # ──────────────────────────────────────────────────────────────────────────────
 
-SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(os.path.dirname(SCRIPT_DIR))   # ballu_isclb_extension/
-EVAL_SCRIPT  = os.path.join(SCRIPT_DIR, "pec_eval_expert_frontier.py")
+SCRIPT_DIR            = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT          = os.path.dirname(os.path.dirname(SCRIPT_DIR))   # ballu_isclb_extension/
+EVAL_SCRIPT           = os.path.join(SCRIPT_DIR, "pec_eval_expert_frontier.py")
+GENERATE_USDS_SCRIPT  = os.path.join(SCRIPT_DIR, "pec_generate_usds.py")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Helpers — USD generation (3D mode)
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _leg_key(leg: float, precision: int = 4) -> str:
+    return f"{round(leg, precision):.{precision}f}"
+
+
+def _generate_usds_for_designs(designs: list, output_dir: str,
+                                leg_precision: int = 4) -> dict | None:
+    """
+    Call pec_generate_usds.py for all unique leg_lengths in *designs*.
+
+    Returns a dict mapping leg_key → abs_usd_path, or None on failure.
+    """
+    designs_data = [[d["GCR"], d["spcf"], d["leg"]] for d in designs]
+
+    tmp = tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, prefix="pec_final_usds_"
+    )
+    json.dump(designs_data, tmp)
+    tmp.close()
+
+    cmd = [
+        sys.executable,
+        GENERATE_USDS_SCRIPT,
+        "--output_dir",    output_dir,
+        "--designs_file",  tmp.name,
+        "--leg_precision", str(leg_precision),
+        "--skip_existing",
+    ]
+    print(f"\n  Generating USDs for final eval designs...")
+    print(f"  cmd: {' '.join(cmd)}")
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=False,   # stream to stdout so user sees progress
+            text=True,
+            cwd=PROJECT_ROOT,
+        )
+    finally:
+        os.unlink(tmp.name)
+
+    if result.returncode != 0:
+        print(f"  [ERROR] USD generation failed (exit {result.returncode}).")
+        return None
+
+    # pec_generate_usds.py prints "USD_LEG_MAP: <json>" — but since we used
+    # capture_output=False, we must fall back to reading the registry file.
+    registry_path = os.path.join(output_dir, "morphology_registry.json")
+    if not os.path.exists(registry_path):
+        print(f"  [ERROR] morphology_registry.json not found at {output_dir}")
+        return None
+
+    with open(registry_path) as f:
+        registry = json.load(f)
+
+    leg_map = {entry["key"]: entry["usd_path"] for entry in registry}
+    print(f"  [INFO] USD map loaded: {len(leg_map)} unique leg lengths.")
+    return leg_map
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -60,6 +130,7 @@ def run_expert_eval(
     headless: bool,
     timeout_h: float,
     usd_rel_path: str | None,
+    usd_order_file: str | None = None,
 ) -> list | None:
     """
     Launch pec_eval_expert_frontier.py for one expert and block until done.
@@ -86,7 +157,9 @@ def run_expert_eval(
     print(f"  {'─' * 66}")
 
     subprocess_env = os.environ.copy()
-    if usd_rel_path:
+    if usd_order_file:
+        subprocess_env["BALLU_USD_ORDER_FILE"] = os.path.abspath(usd_order_file)
+    elif usd_rel_path:
         subprocess_env["BALLU_USD_REL_PATH"] = usd_rel_path
 
     t0 = time.time()
@@ -147,7 +220,9 @@ def main():
     parser.add_argument("--run_name",     type=str, required=True,
                         help="PEC run name (must match an existing pec_state.json).")
     parser.add_argument("--designs_file", type=str, required=True,
-                        help="JSON file of designs to evaluate: [{id, GCR, spcf}, ...]")
+                        help="JSON file of designs to evaluate: "
+                             "[{id, GCR, spcf}, ...] for 2D or "
+                             "[{id, GCR, spcf, leg}, ...] for 3D.")
 
     # Optional PEC paths
     parser.add_argument("--log_root",     type=str, default="logs/pec",
@@ -166,6 +241,8 @@ def main():
                         help="Run Isaac Sim in headless mode.")
     parser.add_argument("--timeout_h", type=float, default=4.0,
                         help="Per-expert eval subprocess timeout in hours (default: 4).")
+    parser.add_argument("--leg_precision", type=int, default=4,
+                        help="Decimal places for leg_length deduplication key (default: 4).")
 
     args = parser.parse_args()
 
@@ -180,10 +257,11 @@ def main():
     with open(state_path) as f:
         state = json.load(f)
 
-    experts      = state["experts"]
+    experts       = state["experts"]
     pec_iter_done = state["iteration"]          # number of completed PEC iters
     last_iter     = pec_iter_done - 1            # 0-based index of last iter
     usd_rel_path  = state.get("usd_rel_path")
+    is_3d         = "leg" in state["design_space"]
     K = len(experts)
 
     # ── Validate designs file ─────────────────────────────────────────────────
@@ -199,6 +277,14 @@ def main():
         print("[ERROR] Designs file is empty.")
         sys.exit(1)
 
+    # Validate 3D designs have leg field if in 3D mode.
+    if is_3d:
+        missing = [i for i, d in enumerate(designs) if "leg" not in d]
+        if missing:
+            print(f"[ERROR] 3D PEC mode but {len(missing)} designs lack 'leg' field "
+                  f"(first missing idx: {missing[0]}).")
+            sys.exit(1)
+
     # ── Create output directory ───────────────────────────────────────────────
     designs_stem = os.path.splitext(os.path.basename(designs_file))[0]
     out_dir = os.path.join(run_dir, "final_eval", designs_stem)
@@ -209,15 +295,43 @@ def main():
     print(f"  PEC Final Evaluation — run: {args.run_name}")
     print(f"{'=' * 70}")
     print(f"  State file       : {state_path}")
+    print(f"  PEC mode         : {'3D (GCR, spcf, leg)' if is_3d else '2D (GCR, spcf)'}")
     print(f"  PEC iters done   : {pec_iter_done}  (evaluating checkpoints from iter {last_iter})")
     print(f"  K experts        : {K}")
     print(f"  Designs file     : {designs_file}  ({F} designs)")
     print(f"  Output dir       : {out_dir}")
-    print(f"  usd_rel_path     : {usd_rel_path or '(not set)'}")
+    if not is_3d:
+        print(f"  usd_rel_path     : {usd_rel_path or '(not set)'}")
     print(f"  Episodes / design: {args.num_episodes}")
     print(f"  Start difficulty : {args.start_difficulty}")
     print(f"  Timeout / expert : {args.timeout_h:.1f} h")
     print(f"{'=' * 70}")
+
+    # ── 3D: Generate USDs for all unique leg_lengths ──────────────────────────
+    usd_order_file = None
+    if is_3d:
+        usds_dir = os.path.join(out_dir, "usds")
+        os.makedirs(usds_dir, exist_ok=True)
+
+        leg_map = _generate_usds_for_designs(designs, usds_dir, args.leg_precision)
+        if leg_map is None:
+            print("[ERROR] USD generation failed — aborting final eval.")
+            sys.exit(1)
+
+        # Build ordered USD list: one path per design in order.
+        usd_order = []
+        for d in designs:
+            key = _leg_key(d["leg"], args.leg_precision)
+            usd_path = leg_map.get(key)
+            if usd_path is None:
+                print(f"[ERROR] No USD found for leg_key '{key}'. leg_map keys: {list(leg_map.keys())}")
+                sys.exit(1)
+            usd_order.append(usd_path)
+
+        usd_order_file = os.path.join(out_dir, "usd_order.json")
+        with open(usd_order_file, "w") as f:
+            json.dump(usd_order, f, indent=2)
+        print(f"  [INFO] USD order file written: {usd_order_file}  ({len(usd_order)} paths)")
 
     # ── Verify checkpoints ────────────────────────────────────────────────────
     for ex in experts:
@@ -266,6 +380,7 @@ def main():
             headless=args.headless,
             timeout_h=args.timeout_h,
             usd_rel_path=usd_rel_path,
+            usd_order_file=usd_order_file,
         )
 
         if results is None:
@@ -281,6 +396,7 @@ def main():
     # ── Save summary ──────────────────────────────────────────────────────────
     summary = {
         "run_name":         args.run_name,
+        "pec_mode":         "3d" if is_3d else "2d",
         "pec_iter_done":    pec_iter_done,
         "checkpoints_from_iter": last_iter,
         "designs_file":     designs_file,
