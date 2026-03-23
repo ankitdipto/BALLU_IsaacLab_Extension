@@ -19,6 +19,7 @@ K: 2                        # Number of specialist experts
 
 GCR_range: [0.725, 0.89]     # [min, max] Gravity Compensation Ratio — REQUIRED
 spcf_range: [0.005, 0.100]  # [min, max] Spring Coefficient          — REQUIRED
+leg_range: [0.20, 0.50]     # [min, max] Leg length (femur=tibia=leg) — set for 3D PEC, omit for 2D
 
 N_init: 50                  # Initial designs sampled per expert from its Gaussian
 

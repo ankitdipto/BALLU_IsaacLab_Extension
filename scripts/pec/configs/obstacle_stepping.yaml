@@ -15,12 +15,13 @@
 # ── Initialization ───────────────────────────────────────────
 # These values are passed to pec_init.py on the first run.
 
-K: 2                        # Number of specialist experts
+K: 3                        # Number of specialist experts
 
 GCR_range: [0.75, 0.89]     # [min, max] Gravity Compensation Ratio — REQUIRED
 spcf_range: [0.001, 0.010]  # [min, max] Spring Coefficient          — REQUIRED
+leg_range: [0.20, 0.48]     # [min, max] Leg length (femur=tibia=leg) — set for 3D PEC, omit for 2D
 
-N_init: 50                  # Initial designs sampled per expert from its Gaussian
+N_init: 30                  # Initial designs sampled per expert from its Gaussian
 
 sigma_scale: 0.10           # Controls initial Gaussian width.
                             # std_d = sigma_scale * range_d / sqrt(K)
@@ -37,11 +38,11 @@ init_strategy: "stochastic_fps"       # Automatic center placement for pec_init.
                             #   "stochastic_fps" — boundary-aware, seed-controlled
                             #                       farthest-point sampling
 
-init_seed: 1                # Preferred global seed for stochastic center placement
+init_seed: 0                # Preferred global seed for stochastic center placement
                             # and initial design sampling. If omitted in CLI/config,
                             # pec_init.py falls back to `seed`.
 
-init_anchor_region: "top_right"
+init_anchor_region: null
                             # Optional seeded anchor for stochastic_fps.
                             #   null        — no forced region
                             #   "top_right" — guarantee one initial expert starts
@@ -53,7 +54,7 @@ target_init_coverage: 0.12  # Optional MC coverage target in (0, 1).
                             # For stochastic_fps, null means: match the legacy
                             # grid coverage at the same K and sigma_scale.
 
-usd_rel_path: morphologies/hetero_library_hvyBloon_lab01.20.26/hetero_0001_fl0.312_tl0.398/hetero_0001_fl0.312_tl0.398.usd
+usd_rel_path: morphologies/hetero_library_hvyBloon_lab01.20.26/hetero_0001_fl0.312_tl0.398/hetero_0001_fl0.312_tl0.398.u
                             # Relative path to the robot USD file; injected into
                             # every Isaac Sim subprocess as BALLU_USD_REL_PATH.
                             # Example:
@@ -71,7 +72,7 @@ centers: null               # Optional manual Gaussian centers.
 
 # ── Loop Control ─────────────────────────────────────────────
 
-max_pec_iterations: 7      # Maximum number of PEC iterations (train→eval→refit)
+max_pec_iterations: 20      # Maximum number of PEC iterations (train→eval→refit)
                             # Can be overridden on the CLI with --max_pec_iterations.
 
 coverage_target: 0.95       # Stop early when MC coverage (exp(-2) threshold)
@@ -90,9 +91,9 @@ dl_buffer: 2                # Safety margin for auto-scaling --dl in later itera
 # ── Expert Training (Step 1) ─────────────────────────────────
 # Passed to pec_train_expert.py (which in turn calls scripts/rsl_rl/train.py).
 
-task: "Isc-BALLU-hetero-general"  # Isaac Lab task name
+task: "Isc-BALLU-hetero-pretrain"  # Isaac Lab task name
 
-num_envs: 4096              # Parallel simulation environments per training run
+num_envs: 1024              # Parallel simulation environments per training run
 max_iterations_iter0: 1600  # PPO steps for PEC iteration 0 (train from scratch — needs more)
 max_iterations: 500         # PPO steps for PEC iterations >= 1 (warm-start — fewer needed)
 headless: true              # Run Isaac Sim without a display
@@ -103,7 +104,7 @@ train_timeout_h: 8.0        # Hard timeout (hours) for each training subprocess
 # ── Frontier Evaluation (Step 2) ─────────────────────────────
 # Passed to pec_evaluate_frontier.py.
 
-F: 100                      # Number of frontier/border candidates to evaluate
+F: 42                      # Number of frontier/border candidates to evaluate
 pool_factor: 20             # Oversample pool size = pool_factor * F
 
 sampling_mode: "auto"       # Candidate sampling strategy:
@@ -111,7 +112,7 @@ sampling_mode: "auto"       # Candidate sampling strategy:
                             #   "border"   — annular band just outside Gaussian cores
                             #   "auto"     — border for iter < auto_switch_iter, then frontier
 
-auto_switch_iter: 5         # In "auto" mode: switch from border to frontier after this iteration
+auto_switch_iter: 17         # In "auto" mode: switch from border to frontier after this iteration
 
 border_inner_ld: -0.5       # Upper log-density cut for border mode
                             # Designs with max_k log p(θ|G_k) > border_inner_ld are already
@@ -121,8 +122,8 @@ border_outer_ld: -2.5       # Lower log-density cut for border mode
                             # Designs with max_k log p(θ|G_k) < border_outer_ld are in the
                             # far frontier; excluded in border mode. (~beyond 2-sigma)
 
-num_episodes: 17             # Episodes per frontier design during evaluation
-start_difficulty: 21         # Starting obstacle level index for each eval env
+num_episodes: 20             # Episodes per frontier design during evaluation
+start_difficulty: 25         # Starting obstacle level index for each eval env
                             # Evaluation curricula begin here and advance/retreat.
 eval_timeout_h: 4.0         # Hard timeout (hours) per expert evaluation subprocess
 
@@ -140,6 +141,6 @@ min_designs: 2              # Minimum number of assigned designs required before
 
 # ── Paths ────────────────────────────────────────────────────
 
-log_root: "logs/pec/2026.17.03"        # Root directory for all PEC state and result files.
+log_root: "logs/pec/2026.03.31"        # Root directory for all PEC state and result files.
                                        # State file: logs/pec/<run_name>/pec_state.json
                                        # Run from ballu_isclb_extension/.
