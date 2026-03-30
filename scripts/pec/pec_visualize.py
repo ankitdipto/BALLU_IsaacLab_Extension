@@ -11,13 +11,9 @@ Plots the K expert Gaussians in the design space.
 
 3D mode (GCR × spcf × leg)
 ----------------------------
-- Three 2D marginal subplots in one figure:
-    1. GCR vs spcf  (X = spcf,  Y = GCR)
-    2. GCR vs leg   (X = leg,   Y = GCR)
-    3. spcf vs leg  (X = leg,   Y = spcf)
-- Each subplot shows the 2D marginal Gaussian (diagonal covariance → axis-aligned
-  ellipse) with heatmap, training designs projected onto the 2 axes, and optional
-  frontier overlay.
+- Single 3D axes: wireframe ellipsoids (1σ/2σ) + 3D design scatter.
+- Axes: X = spcf,  Y = leg,  Z = GCR.
+- If --itr is given and frontier scores exist: 3D frontier star overlay.
 
 Usage (run from ballu_isclb_extension/)
 -----------------------------------------
@@ -117,6 +113,37 @@ def _ellipse_patch_marginal(mu_x, std_x, mu_y, std_y, n_sigma: float,
         linestyle=linestyle,
         linewidth=lw,
         zorder=4,
+    )
+
+
+def _ellipsoid_wireframe(ax3d, mu, sigma, n_sigma: float, color,
+                          linestyle="-", alpha=0.28, lw=0.6,
+                          rstride=3, cstride=3):
+    """Draw an axis-aligned ellipsoid wireframe on a 3D axes.
+
+    Design-space convention: mu = [GCR, spcf, leg].
+    Plot axis mapping: X = spcf (dim 1), Y = leg (dim 2), Z = GCR (dim 0).
+    """
+    std_gcr  = math.sqrt(sigma[0][0])
+    std_spcf = math.sqrt(sigma[1][1])
+    std_leg  = math.sqrt(sigma[2][2])
+
+    # Parametric unit sphere
+    u = np.linspace(0, 2 * np.pi, 40)
+    v = np.linspace(0, np.pi, 20)
+    sx = np.outer(np.cos(u), np.sin(v))
+    sy = np.outer(np.sin(u), np.sin(v))
+    sz = np.outer(np.ones_like(u), np.cos(v))
+
+    # Scale each axis by the expert's std and shift to its mean.
+    xs = mu[1] + n_sigma * std_spcf * sx  # X = spcf
+    ys = mu[2] + n_sigma * std_leg  * sy  # Y = leg
+    zs = mu[0] + n_sigma * std_gcr  * sz  # Z = GCR
+
+    ax3d.plot_wireframe(
+        xs, ys, zs,
+        color=color, linestyle=linestyle, alpha=alpha,
+        linewidth=lw, rstride=rstride, cstride=cstride,
     )
 
 
@@ -542,54 +569,96 @@ def main():
         plt.tight_layout()
 
     # ═════════════════════════════════════════════════════════════════════════
-    # 3D mode — three pairwise 2D marginal subplots
+    # 3D mode — single true-3D axes with wireframe ellipsoids
+    # Axis mapping: X = spcf,  Y = leg,  Z = GCR
     # ═════════════════════════════════════════════════════════════════════════
     else:
-        # Axis specs: (ix, iy, x_lo, x_hi, y_lo, y_hi, x_label, y_label)
-        subplot_specs = [
-            # GCR vs spcf: X=spcf (dim 1), Y=GCR (dim 0)
-            (1, 0, spcf_lo, spcf_hi, gcr_lo,  gcr_hi,
-             "Spring Coefficient (spcf)", "Gravity Compensation Ratio (GCR)"),
-            # GCR vs leg: X=leg (dim 2), Y=GCR (dim 0)
-            (2, 0, leg_lo,  leg_hi,  gcr_lo,  gcr_hi,
-             "Leg Length (leg)", "Gravity Compensation Ratio (GCR)"),
-            # spcf vs leg: X=leg (dim 2), Y=spcf (dim 1)
-            (2, 1, leg_lo,  leg_hi,  spcf_lo, spcf_hi,
-             "Leg Length (leg)", "Spring Coefficient (spcf)"),
-        ]
-        subplot_titles = [
-            "GCR × spcf (marginal)",
-            "GCR × leg (marginal)",
-            "spcf × leg (marginal)",
-        ]
+        fig = plt.figure(figsize=(13, 9))
+        ax3d = fig.add_subplot(111, projection="3d")
 
-        fig, axes = plt.subplots(1, 3, figsize=(21, 6))
-        fig.suptitle(
+        for ex in experts:
+            kid   = ex["id"]
+            color = _expert_color(kid)
+            mu    = ex["mu"]   # [GCR, spcf, leg]
+
+            # 1σ solid wireframe
+            _ellipsoid_wireframe(ax3d, mu, ex["sigma"], 1.0, color,
+                                 linestyle="-", alpha=0.30, lw=0.8)
+            # 2σ dashed wireframe
+            if not args.no_2sigma:
+                _ellipsoid_wireframe(ax3d, mu, ex["sigma"], 2.0, color,
+                                     linestyle="--", alpha=0.12, lw=0.5)
+
+            # Gaussian centre — filled plus marker (X=spcf, Y=leg, Z=GCR)
+            ax3d.scatter([mu[1]], [mu[2]], [mu[0]],
+                         color=color, s=140, marker="P",
+                         edgecolors="black", linewidths=0.8,
+                         zorder=10, depthshade=False)
+
+            # Training design points
+            designs = ex.get("designs", [])
+            if designs:
+                d_arr = np.array(designs)   # (N, 3): [GCR, spcf, leg]
+                ax3d.scatter(d_arr[:, 1], d_arr[:, 2], d_arr[:, 0],
+                             s=20, color=color, alpha=0.65,
+                             edgecolors="white", linewidths=0.3,
+                             marker="o", depthshade=True)
+
+        # Frontier overlay
+        if frontier_data is not None:
+            candidates    = frontier_data["candidates"]
+            scores_mat    = {int(k): v for k, v in
+                             frontier_data["scores_matrix"].items()}
+            valid_experts = [kid for kid, s in scores_mat.items()
+                             if s is not None]
+            leg_mid = (leg_lo + leg_hi) / 2.0
+
+            for cand in candidates:
+                fid   = cand["id"]
+                g_val = cand["GCR"]
+                s_val = cand["spcf"]
+                l_val = cand.get("leg", leg_mid)
+
+                best_score = -1
+                winner = None
+                for kid in valid_experts:
+                    sc = scores_mat[kid][fid]
+                    if sc > best_score:
+                        best_score = sc
+                        winner = kid
+
+                color = _expert_color(winner) \
+                        if winner is not None and best_score > 0 else "#aaaaaa"
+
+                ax3d.scatter([s_val], [l_val], [g_val],
+                             s=90, color=color, marker="*",
+                             edgecolors="black", linewidths=0.5,
+                             alpha=0.9, depthshade=False)
+
+                if best_score > 0:
+                    ax3d.text(s_val, l_val, g_val, f"  {best_score}",
+                              fontsize=6.5, color=color)
+
+        # Axis limits and labels
+        ax3d.set_xlim(spcf_lo, spcf_hi)
+        ax3d.set_ylim(leg_lo,  leg_hi)
+        ax3d.set_zlim(gcr_lo,  gcr_hi)
+        ax3d.set_xlabel("Spring Coefficient (spcf)", labelpad=10)
+        ax3d.set_ylabel("Leg Length (leg)",           labelpad=10)
+        ax3d.set_zlabel("GCR",                        labelpad=10)
+        ax3d.xaxis.set_major_formatter(
+            matplotlib.ticker.FormatStrFormatter("%.4f"))
+        ax3d.tick_params(axis="x", rotation=30)
+
+        ax3d.set_title(
             f"PEC 3D Gaussian Mixture — {args.run_name}{title_itr}",
-            fontsize=12, y=1.01,
+            fontsize=11, pad=15,
         )
 
-        for ax, spec, sub_title in zip(axes, subplot_specs, subplot_titles):
-            ix, iy, x_lo, x_hi, y_lo, y_hi, x_lbl, y_lbl = spec
-            _render_marginal_subplot(
-                ax=ax,
-                experts=experts,
-                ix=ix, iy=iy,
-                x_lo=x_lo, x_hi=x_hi,
-                y_lo=y_lo, y_hi=y_hi,
-                x_label=x_lbl, y_label=y_lbl,
-                grid_res=args.grid_res,
-                log_thresh=log_thresh,
-                no_2sigma=args.no_2sigma,
-                frontier_data=frontier_data,
-                itr=args.itr,
-            )
-            ax.set_title(sub_title, fontsize=10)
-
-        # Shared legend on the last subplot.
-        legend_handles = _build_legend_handles(with_frontier=frontier_data is not None)
-        axes[-1].legend(handles=legend_handles, loc="lower right",
-                        fontsize=8, framealpha=0.85)
+        legend_handles = _build_legend_handles(
+            with_frontier=frontier_data is not None)
+        ax3d.legend(handles=legend_handles, loc="upper left",
+                    fontsize=8, framealpha=0.85)
 
         plt.tight_layout()
 
