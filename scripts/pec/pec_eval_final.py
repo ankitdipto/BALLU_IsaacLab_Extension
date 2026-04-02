@@ -1,11 +1,12 @@
 """
 PEC Final Evaluation
 ====================
-Evaluate all PEC experts on an unseen set of designs.
+Evaluate PEC experts on an unseen set of designs.
 
 Reads ``pec_state.json`` to discover the latest checkpoint for each expert,
-then calls ``pec_eval_expert_frontier.py`` once per expert (sequentially, one
-GPU process at a time) using the provided designs file as ``--frontier_file``.
+then calls ``pec_eval_expert_frontier.py`` once per selected expert
+(sequentially, one GPU process at a time) using the provided designs file as
+``--frontier_file``.
 
 The designs file format depends on the PEC mode:
 
@@ -109,7 +110,15 @@ def _generate_usds_for_designs(designs: list, output_dir: str,
     with open(registry_path) as f:
         registry = json.load(f)
 
-    leg_map = {entry["key"]: entry["usd_path"] for entry in registry}
+    # pec_generate_usds.py writes a dict: { leg_key: { "leg", "usd_path", "morph_id" }, ... }
+    if isinstance(registry, dict):
+        leg_map = {k: v["usd_path"] for k, v in registry.items() if isinstance(v, dict) and "usd_path" in v}
+    elif isinstance(registry, list):
+        leg_map = {entry["key"]: entry["usd_path"] for entry in registry}
+    else:
+        print(f"  [ERROR] Unexpected morphology_registry.json shape: {type(registry)}")
+        return None
+
     print(f"  [INFO] USD map loaded: {len(leg_map)} unique leg lengths.")
     return leg_map
 
@@ -243,6 +252,9 @@ def main():
                         help="Per-expert eval subprocess timeout in hours (default: 4).")
     parser.add_argument("--leg_precision", type=int, default=4,
                         help="Decimal places for leg_length deduplication key (default: 4).")
+    parser.add_argument("--expert_id", type=int, default=None,
+                        help="If set, evaluate only this expert id. "
+                             "If omitted, evaluate all experts.")
 
     args = parser.parse_args()
 
@@ -263,6 +275,16 @@ def main():
     usd_rel_path  = state.get("usd_rel_path")
     is_3d         = "leg" in state["design_space"]
     K = len(experts)
+
+    if args.expert_id is not None:
+        experts_to_eval = [e for e in experts if e["id"] == args.expert_id]
+        if not experts_to_eval:
+            valid = sorted(e["id"] for e in experts)
+            print(f"[ERROR] Expert id={args.expert_id} not found. Valid ids: {valid}")
+            sys.exit(1)
+    else:
+        experts_to_eval = experts
+    eval_ids = [e["id"] for e in experts_to_eval]
 
     # ── Validate designs file ─────────────────────────────────────────────────
     designs_file = os.path.abspath(args.designs_file)
@@ -297,7 +319,11 @@ def main():
     print(f"  State file       : {state_path}")
     print(f"  PEC mode         : {'3D (GCR, spcf, leg)' if is_3d else '2D (GCR, spcf)'}")
     print(f"  PEC iters done   : {pec_iter_done}  (evaluating checkpoints from iter {last_iter})")
-    print(f"  K experts        : {K}")
+    print(f"  K experts total  : {K}")
+    if args.expert_id is None:
+        print(f"  Evaluating       : all experts")
+    else:
+        print(f"  Evaluating       : expert {args.expert_id}")
     print(f"  Designs file     : {designs_file}  ({F} designs)")
     print(f"  Output dir       : {out_dir}")
     if not is_3d:
@@ -334,7 +360,7 @@ def main():
         print(f"  [INFO] USD order file written: {usd_order_file}  ({len(usd_order)} paths)")
 
     # ── Verify checkpoints ────────────────────────────────────────────────────
-    for ex in experts:
+    for ex in experts_to_eval:
         kid  = ex["id"]
         ckpt = ex.get("checkpoint") or ""
         trained_at = ex.get("last_trained_pec_iter")
@@ -350,13 +376,13 @@ def main():
             print(f"           {ckpt}")
 
     # ── Evaluate each expert sequentially ─────────────────────────────────────
-    print(f"\n  Running {K} expert eval subprocesses (sequential, single GPU)...")
+    print(f"\n  Running {len(experts_to_eval)} expert eval subprocesses (sequential, single GPU)...")
 
     scores_matrix  = {}   # expert_id -> list[int] | None
     expert_results = {}   # expert_id -> list[dict] | None
 
     t_total_start = time.time()
-    for ex in experts:
+    for ex in experts_to_eval:
         kid  = ex["id"]
         ckpt = ex.get("checkpoint") or ""
 
@@ -401,7 +427,9 @@ def main():
         "checkpoints_from_iter": last_iter,
         "designs_file":     designs_file,
         "F":                F,
-        "K":                K,
+        "K_total":          K,
+        "K_evaluated":      len(experts_to_eval),
+        "evaluated_expert_ids": eval_ids,
         "num_episodes":     args.num_episodes,
         "start_difficulty": args.start_difficulty,
         "designs":          designs,
@@ -419,12 +447,12 @@ def main():
     print(f"  Summary saved: {summary_file}")
 
     print(f"\n  Scores (best curriculum level per design):")
-    header = f"  {'Design':>8}" + "".join(f"  Expert{k:>2}" for k in range(K))
+    header = f"  {'Design':>8}" + "".join(f"  Expert{kid:>2}" for kid in eval_ids)
     print(header)
-    print("  " + "-" * (8 + K * 10))
+    print("  " + "-" * (8 + len(eval_ids) * 10))
     for f_idx, des in enumerate(designs[:20]):
         row = f"  {f_idx:>8}"
-        for kid in range(K):
+        for kid in eval_ids:
             s = scores_matrix.get(kid)
             val = s[f_idx] if s is not None else "skip"
             row += f"  {val:>8}"
@@ -433,7 +461,7 @@ def main():
         print(f"  ... ({F - 20} more rows)")
 
     print(f"\n  Mean best-level per expert (PEC oracle = row-wise max):")
-    for kid in range(K):
+    for kid in eval_ids:
         s = scores_matrix.get(kid)
         if s is None:
             print(f"    Expert {kid}: skipped")
