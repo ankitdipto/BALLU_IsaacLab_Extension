@@ -109,6 +109,17 @@ DIFF_BINS = np.arange(diff_pec.min() - 1.5, diff_pec.max() + 2.5, 1)
 # ─────────────────────────────────────────────────────────────────────────────
 # Figure 1 — Score distributions
 # ─────────────────────────────────────────────────────────────────────────────
+# Plotting only the oracle vs baseline score distribution
+plt.hist(bl_scores,  color="#555555", label=f"Baseline (μ={bl_scores.mean():.1f})", bins=BIN_EDGES, alpha=0.6, edgecolor="white", linewidth=0.4)
+plt.hist(pec_scores, color="#2ca02c", label=f"GES max  (μ={pec_scores.mean():.1f})", bins=BIN_EDGES, alpha=0.6, edgecolor="white", linewidth=0.4)
+plt.xlabel("Curriculum level reached")
+plt.ylabel("# of designs")
+plt.title("Baseline vs GES oracle")
+plt.legend(fontsize=9)
+plt.grid(axis="y", alpha=0.3)
+plt.savefig(os.path.join(args.output_dir, "score_histograms_oracle_vs_baseline.png"), dpi=150)
+plt.close()
+
 fig, axes = plt.subplots(1, 2, figsize=(14, 5))
 fig.suptitle(f"{args.run_name} — Score distributions ({N} designs, K={K} experts)", fontsize=13)
 
