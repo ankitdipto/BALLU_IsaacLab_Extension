@@ -284,7 +284,7 @@ class BALLUSoftMoEPPORunnerCfg(RslRlOnPolicyRunnerCfg):
         critic_hidden_dims=[128, 64, 32],
         gate_hidden_dims=[64, 32],
         activation="elu",
-        num_experts=3,
+        num_experts=5,
         num_morphology_obs=11,  # BALLU morphology vector dimension (11)
         routing_type="soft",    # 'soft' = weighted combination, 'hard' = one-hot selection
         tau_initial=1.0,        # Initial temperature (higher = softer selection)
