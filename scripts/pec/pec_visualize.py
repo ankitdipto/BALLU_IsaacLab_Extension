@@ -238,8 +238,8 @@ def _render_marginal_subplot(
         if designs:
             d_arr = np.array(designs)
             ax.scatter(d_arr[:, ix], d_arr[:, iy],
-                       s=18, color=color, alpha=0.6,
-                       edgecolors="white", linewidths=0.4,
+                       s=60, color=color, alpha=0.7,
+                       edgecolors="white", linewidths=0.5,
                        zorder=3, marker="o")
 
     # Frontier overlay
@@ -266,7 +266,7 @@ def _render_marginal_subplot(
             color = _expert_color(winner) if winner is not None and best_score > 0 \
                     else "#aaaaaa"
 
-            ax.scatter(x_val, y_val, s=80, color=color,
+            ax.scatter(x_val, y_val, s=110, color=color,
                        marker="*", edgecolors="black", linewidths=0.5,
                        zorder=6, alpha=0.9)
 
@@ -525,7 +525,7 @@ def main():
                 color = _expert_color(winner) if winner is not None and best_score > 0 \
                         else "#aaaaaa"
 
-                ax.scatter(s_val, g_val, s=80, color=color,
+                ax.scatter(s_val, g_val, s=110, color=color,
                            marker="*", edgecolors="black", linewidths=0.5,
                            zorder=6, alpha=0.9)
 
@@ -600,8 +600,8 @@ def main():
             if designs:
                 d_arr = np.array(designs)   # (N, 3): [GCR, spcf, leg]
                 ax3d.scatter(d_arr[:, 1], d_arr[:, 2], d_arr[:, 0],
-                             s=20, color=color, alpha=0.65,
-                             edgecolors="white", linewidths=0.3,
+                             s=60, color=color, alpha=0.75,
+                             edgecolors="white", linewidths=0.4,
                              marker="o", depthshade=True)
 
         # Frontier overlay
@@ -631,7 +631,7 @@ def main():
                         if winner is not None and best_score > 0 else "#aaaaaa"
 
                 ax3d.scatter([s_val], [l_val], [g_val],
-                             s=90, color=color, marker="*",
+                             s=110, color=color, marker="*",
                              edgecolors="black", linewidths=0.5,
                              alpha=0.9, depthshade=False)
 
