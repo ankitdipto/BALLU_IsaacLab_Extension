@@ -13,7 +13,7 @@ class BALLUPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20 #25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 100
-    experiment_name = "lab_03.31.2026"
+    experiment_name = "lab_04.07.2026"
     empirical_normalization = True  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
@@ -89,7 +89,7 @@ class BALLUSpecialistPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20
     max_iterations = 1500
     save_interval = 100
-    experiment_name = "lab_03.31.2026"
+    experiment_name = "lab_04.07.2026"
     # SpecialistActorCritic applies per-expert normalization loaded from each checkpoint.
     # Keep runner-level normalization disabled to avoid mismatched/global normalization at test-time.
     empirical_normalization = False
@@ -123,7 +123,7 @@ class BALLUPPORunnerWalkingCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20 #25 # Horizon: Number of steps per environment before a policy update
     max_iterations = 1500
     save_interval = 50
-    experiment_name = "lab_03.31.2026"
+    experiment_name = "lab_04.07.2026"
     empirical_normalization = True  # Obs norm uses running mean and std. 
                                     # If true, compute stats empirically
                                     # from the current batch of observations
@@ -210,7 +210,7 @@ class BALLUMoEPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20
     max_iterations = 2000
     save_interval = 100
-    experiment_name = "lab_03.31.2026"
+    experiment_name = "lab_04.07.2026"
     empirical_normalization = True
     
     policy = RslRlMoEActorCriticCfg(
@@ -275,7 +275,7 @@ class BALLUSoftMoEPPORunnerCfg(RslRlOnPolicyRunnerCfg):
     num_steps_per_env = 20
     max_iterations = 2000
     save_interval = 100
-    experiment_name = "lab_03.31.2026"
+    experiment_name = "lab_04.07.2026"
     empirical_normalization = True
     
     policy = RslRlMoEActorCriticCfg(
