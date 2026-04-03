@@ -10,7 +10,8 @@ region in the design space.  Supports two modes:
   3D  (default): design_space = {GCR, spcf, leg}  when --leg_range is given
 
 Experts are seeded on a grid or with boundary-aware stochastic farthest-point
-sampling, and optionally calibrated to a target initial MC coverage.
+sampling (optionally followed by Lloyd / CVT relaxation on the same candidate
+pool), and optionally calibrated to a target initial MC coverage.
 
 Output
 ------
@@ -55,18 +56,56 @@ def grid_centers(K: int, gcr_lo: float, gcr_hi: float,
     return centers[:K]
 
 
-def stochastic_fps_centers(K: int,
-                           gcr_lo: float, gcr_hi: float,
-                           spcf_lo: float, spcf_hi: float,
-                           pool_size: int,
-                           anchor_region: str | None,
-                           jitter_scale: float,
-                           rng: np.random.Generator):
-    """Boundary-aware stochastic FPS in normalized 2D [0,1]² space."""
+def lloyd_relax_cvt(
+    centers_unit: np.ndarray,
+    pool: np.ndarray,
+    max_iter: int,
+    tol: float,
+) -> np.ndarray:
+    """
+    Lloyd relaxation (discrete CVT): repeatedly assign each pool point to the
+    nearest center and move each center to the mean of its Voronoi cell.
+
+    Operates in normalized [0, 1]^d. Empty cells keep the previous center.
+    Centers are clipped to the unit hypercube each iteration.
+    """
+    centers = np.asarray(centers_unit, dtype=np.float64).copy()
+    K, d = centers.shape
+    if pool.shape[1] != d:
+        raise ValueError(f"pool dim {pool.shape[1]} != centers dim {d}")
+    if pool.shape[0] < K:
+        raise ValueError(f"Lloyd pool_size must be >= K, got {pool.shape[0]}, K={K}")
+
+    for _ in range(max_iter):
+        dists_sq = np.sum((pool[:, None, :] - centers[None, :, :]) ** 2, axis=2)
+        labels = np.argmin(dists_sq, axis=1)
+
+        new_centers = np.zeros_like(centers)
+        for k in range(K):
+            mask = labels == k
+            if np.any(mask):
+                new_centers[k] = pool[mask].mean(axis=0)
+            else:
+                new_centers[k] = centers[k]
+        new_centers = np.clip(new_centers, 0.0, 1.0)
+        shift = float(np.max(np.linalg.norm(new_centers - centers, axis=1)))
+        centers = new_centers
+        if shift < tol:
+            break
+    return centers
+
+
+def _fps_select_unit_2d(
+    K: int,
+    pool: np.ndarray,
+    anchor_region: str | None,
+    rng: np.random.Generator,
+) -> np.ndarray:
+    """Boundary-aware stochastic FPS in normalized 2D — returns (K, 2) unit centers."""
+    pool_size = pool.shape[0]
     if pool_size < K:
         raise ValueError(f"pool_size must be >= K, got pool_size={pool_size}, K={K}")
 
-    pool = rng.uniform(0.0, 1.0, size=(pool_size, 2))
     chosen = np.zeros(pool_size, dtype=bool)
 
     boundary_clearance = np.min(np.stack([
@@ -99,11 +138,70 @@ def stochastic_fps_centers(K: int,
         min_dist_sq = np.minimum(min_dist_sq, dist_sq)
         min_dist_sq[chosen] = -np.inf
 
-    centers_unit = np.array(selected, dtype=np.float64)
+    return np.array(selected, dtype=np.float64)
+
+
+def _fps_select_unit_3d(K: int, pool: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """Boundary-aware stochastic FPS in normalized 3D — returns (K, 3) unit centers."""
+    pool_size = pool.shape[0]
+    if pool_size < K:
+        raise ValueError(f"pool_size must be >= K, got pool_size={pool_size}, K={K}")
+
+    chosen = np.zeros(pool_size, dtype=bool)
+
+    boundary_clearance = np.min(np.stack([
+        pool[:, 0], 1.0 - pool[:, 0],
+        pool[:, 1], 1.0 - pool[:, 1],
+        pool[:, 2], 1.0 - pool[:, 2],
+    ], axis=1), axis=1)
+    boundary_gain = 2.0
+
+    first_idx = int(np.argmax(boundary_clearance + 1e-6 * rng.random(pool_size)))
+    chosen[first_idx] = True
+    selected = [pool[first_idx].copy()]
+
+    min_dist_sq = np.sum((pool - pool[first_idx]) ** 2, axis=1)
+    min_dist_sq[chosen] = -np.inf
+
+    for _ in range(1, K):
+        nearest_dist = np.sqrt(np.maximum(min_dist_sq, 0.0))
+        score = np.minimum(nearest_dist, boundary_gain * boundary_clearance)
+        score[chosen] = -np.inf
+        idx = int(np.argmax(score))
+        chosen[idx] = True
+        selected.append(pool[idx].copy())
+        dist_sq = np.sum((pool - pool[idx]) ** 2, axis=1)
+        min_dist_sq = np.minimum(min_dist_sq, dist_sq)
+        min_dist_sq[chosen] = -np.inf
+
+    return np.array(selected, dtype=np.float64)
+
+
+def stochastic_fps_centers(K: int,
+                           gcr_lo: float, gcr_hi: float,
+                           spcf_lo: float, spcf_hi: float,
+                           pool_size: int,
+                           anchor_region: str | None,
+                           jitter_scale: float,
+                           rng: np.random.Generator,
+                           lloyd_iterations: int = 0,
+                           lloyd_tol: float = 1e-4):
+    """Boundary-aware stochastic FPS in normalized 2D [0,1]² space."""
+    if pool_size < K:
+        raise ValueError(f"pool_size must be >= K, got pool_size={pool_size}, K={K}")
+
+    pool = rng.uniform(0.0, 1.0, size=(pool_size, 2))
+    centers_unit = _fps_select_unit_2d(K, pool, anchor_region, rng)
+
     if jitter_scale > 0.0:
         jitter_std = jitter_scale / math.sqrt(max(K, 1))
-        centers_unit += rng.normal(loc=0.0, scale=jitter_std, size=centers_unit.shape)
+        centers_unit = centers_unit + rng.normal(
+            loc=0.0, scale=jitter_std, size=centers_unit.shape
+        )
         centers_unit = np.clip(centers_unit, 0.0, 1.0)
+
+    if lloyd_iterations > 0:
+        centers_unit = lloyd_relax_cvt(centers_unit, pool, lloyd_iterations, lloyd_tol)
 
     centers = []
     for u_gcr, u_spcf in centers_unit:
@@ -264,45 +362,25 @@ def stochastic_fps_centers_3d(K: int,
                                leg_lo: float,  leg_hi: float,
                                pool_size: int,
                                jitter_scale: float,
-                               rng: np.random.Generator):
+                               rng: np.random.Generator,
+                               lloyd_iterations: int = 0,
+                               lloyd_tol: float = 1e-4):
     """Boundary-aware stochastic FPS in normalized 3D [0,1]³ space."""
     if pool_size < K:
         raise ValueError(f"pool_size must be >= K, got pool_size={pool_size}, K={K}")
 
     pool = rng.uniform(0.0, 1.0, size=(pool_size, 3))
-    chosen = np.zeros(pool_size, dtype=bool)
+    centers_unit = _fps_select_unit_3d(K, pool, rng)
 
-    # Boundary clearance: min distance to any face of the [0,1]³ cube.
-    boundary_clearance = np.min(np.stack([
-        pool[:, 0], 1.0 - pool[:, 0],
-        pool[:, 1], 1.0 - pool[:, 1],
-        pool[:, 2], 1.0 - pool[:, 2],
-    ], axis=1), axis=1)
-    boundary_gain = 2.0
-
-    first_idx = int(np.argmax(boundary_clearance + 1e-6 * rng.random(pool_size)))
-    chosen[first_idx] = True
-    selected = [pool[first_idx].copy()]
-
-    min_dist_sq = np.sum((pool - pool[first_idx]) ** 2, axis=1)
-    min_dist_sq[chosen] = -np.inf
-
-    for _ in range(1, K):
-        nearest_dist = np.sqrt(np.maximum(min_dist_sq, 0.0))
-        score = np.minimum(nearest_dist, boundary_gain * boundary_clearance)
-        score[chosen] = -np.inf
-        idx = int(np.argmax(score))
-        chosen[idx] = True
-        selected.append(pool[idx].copy())
-        dist_sq = np.sum((pool - pool[idx]) ** 2, axis=1)
-        min_dist_sq = np.minimum(min_dist_sq, dist_sq)
-        min_dist_sq[chosen] = -np.inf
-
-    centers_unit = np.array(selected, dtype=np.float64)
     if jitter_scale > 0.0:
         jitter_std = jitter_scale / math.sqrt(max(K, 1))
-        centers_unit += rng.normal(loc=0.0, scale=jitter_std, size=centers_unit.shape)
+        centers_unit = centers_unit + rng.normal(
+            loc=0.0, scale=jitter_std, size=centers_unit.shape
+        )
         centers_unit = np.clip(centers_unit, 0.0, 1.0)
+
+    if lloyd_iterations > 0:
+        centers_unit = lloyd_relax_cvt(centers_unit, pool, lloyd_iterations, lloyd_tol)
 
     centers = []
     for u_g, u_s, u_l in centers_unit:
@@ -477,8 +555,22 @@ def main():
     parser.add_argument("--init_strategy", type=str, default="grid",
                         choices=["grid", "stochastic_fps"])
     parser.add_argument("--target_init_coverage", type=float, default=None)
-    parser.add_argument("--init_pool_size", type=int, default=2048)
+    parser.add_argument("--init_pool_size", type=int, default=10_000)
     parser.add_argument("--init_jitter_scale", type=float, default=0.0)
+    parser.add_argument(
+        "--lloyd_iterations",
+        type=int,
+        default=12,
+        help="After FPS (+ jitter), run this many Lloyd / CVT relaxation steps "
+             "on the FPS candidate pool (0 = disabled). Only applies to "
+             "stochastic_fps.",
+    )
+    parser.add_argument(
+        "--lloyd_tol",
+        type=float,
+        default=1e-4,
+        help="Stop Lloyd early when max center movement in unit space falls below this.",
+    )
     parser.add_argument("--coverage_n_mc", type=int, default=10_000)
     parser.add_argument("--coverage_seed", type=int, default=DEFAULT_COVERAGE_SEED)
     parser.add_argument("--coverage_tol", type=float, default=1e-3)
@@ -548,6 +640,9 @@ def main():
         centers_source = "manual (--centers)"
 
     elif args.init_strategy == "stochastic_fps":
+        if args.lloyd_iterations < 0:
+            print("[ERROR] --lloyd_iterations must be >= 0.")
+            sys.exit(1)
         if is_3d:
             centers = stochastic_fps_centers_3d(
                 K=args.K,
@@ -557,6 +652,8 @@ def main():
                 pool_size=args.init_pool_size,
                 jitter_scale=args.init_jitter_scale,
                 rng=center_rng,
+                lloyd_iterations=args.lloyd_iterations,
+                lloyd_tol=args.lloyd_tol,
             )
         else:
             centers = stochastic_fps_centers(
@@ -567,10 +664,14 @@ def main():
                 anchor_region=args.init_anchor_region,
                 jitter_scale=args.init_jitter_scale,
                 rng=center_rng,
+                lloyd_iterations=args.lloyd_iterations,
+                lloyd_tol=args.lloyd_tol,
             )
         centers_source = "automatic stochastic_fps"
         if not is_3d and args.init_anchor_region is not None:
             centers_source += f" + anchor({args.init_anchor_region})"
+        if args.lloyd_iterations > 0:
+            centers_source += f" + lloyd({args.lloyd_iterations}, tol={args.lloyd_tol})"
     else:
         if is_3d:
             centers = grid_centers_3d(args.K, gcr_lo, gcr_hi, spcf_lo, spcf_hi,
@@ -718,6 +819,8 @@ def main():
     if effective_strategy == "stochastic_fps":
         state["init_pool_size"]    = args.init_pool_size
         state["init_jitter_scale"] = args.init_jitter_scale
+        state["init_lloyd_iterations"] = args.lloyd_iterations
+        state["init_lloyd_tol"]        = args.lloyd_tol
 
     with open(state_path, "w") as f:
         json.dump(state, f, indent=2)
@@ -737,6 +840,8 @@ def main():
     print(f"  init_strategy    : {effective_strategy}")
     print(f"  init_seed        : {init_seed}")
     print(f"  Centers source   : {centers_source}")
+    if effective_strategy == "stochastic_fps" and args.lloyd_iterations > 0:
+        print(f"  Lloyd iterations : {args.lloyd_iterations}  (tol={args.lloyd_tol})")
     print(f"  N_init / expert  : {args.N_init}")
     print(f"  sigma_scale      : {sigma_scale_used:.6f}")
     if sigma_calibrated:

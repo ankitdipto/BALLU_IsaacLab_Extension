@@ -234,6 +234,10 @@ def step_init(run_name: str, config: dict, overwrite: bool) -> int:
         args += ["--init_anchor_region", config["init_anchor_region"]]
     if config.get("target_init_coverage") is not None:
         args += ["--target_init_coverage", config["target_init_coverage"]]
+    if config.get("lloyd_iterations") is not None:
+        args += ["--lloyd_iterations", str(config["lloyd_iterations"])]
+    if config.get("lloyd_tol") is not None:
+        args += ["--lloyd_tol", str(config["lloyd_tol"])]
     if config.get("usd_rel_path"):
         args += ["--usd_rel_path", config["usd_rel_path"]]
     if config.get("centers"):
