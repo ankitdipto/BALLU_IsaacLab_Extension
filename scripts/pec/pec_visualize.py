@@ -57,6 +57,13 @@ EXPERT_COLORS = [
     "#999999",   # grey
 ]
 
+# Font sizes (pt) — larger defaults for print / slides
+FS_TITLE = 14
+FS_AXIS = 13
+FS_LEGEND = 11
+FS_ANNOT = 10
+FS_TICK = 12
+
 
 def _expert_color(kid: int) -> str:
     return EXPERT_COLORS[kid % len(EXPERT_COLORS)]
@@ -275,13 +282,14 @@ def _render_marginal_subplot(
                     str(best_score),
                     xy=(x_val, y_val),
                     xytext=(3, 3), textcoords="offset points",
-                    fontsize=6.5, color=color, zorder=7,
+                    fontsize=FS_ANNOT, color=color, zorder=7,
                 )
 
     ax.set_xlim(x_lo, x_hi)
     ax.set_ylim(y_lo, y_hi)
-    ax.set_xlabel(x_label, fontsize=10)
-    ax.set_ylabel(y_label, fontsize=10)
+    ax.set_xlabel(x_label, fontsize=FS_AXIS)
+    ax.set_ylabel(y_label, fontsize=FS_AXIS)
+    ax.tick_params(axis="both", which="major", labelsize=FS_TICK)
 
     # Format x-tick labels with enough decimal places for spcf.
     if x_hi - x_lo < 0.5:
@@ -534,7 +542,7 @@ def main():
                         str(best_score),
                         xy=(s_val, g_val),
                         xytext=(3, 3), textcoords="offset points",
-                        fontsize=6.5, color=color, zorder=7,
+                        fontsize=FS_ANNOT, color=color, zorder=7,
                     )
 
             legend_handles += [
@@ -544,13 +552,14 @@ def main():
             ]
 
         ax.set_title(f"PEC Gaussian Mixture — {args.run_name}{title_itr}",
-                     fontsize=11, pad=10)
-        ax.set_xlabel("Spring Coefficient  (spcf)", fontsize=11)
-        ax.set_ylabel("Gravity Compensation Ratio  (GCR)", fontsize=11)
+                     fontsize=FS_TITLE, pad=12)
+        ax.set_xlabel("Spring Coefficient  (spcf)", fontsize=FS_AXIS)
+        ax.set_ylabel("Gravity Compensation Ratio  (GCR)", fontsize=FS_AXIS)
         ax.set_xlim(spcf_lo, spcf_hi)
         ax.set_ylim(gcr_lo,  gcr_hi)
         ax.xaxis.set_major_formatter(matplotlib.ticker.FormatStrFormatter("%.4f"))
         ax.tick_params(axis="x", rotation=30)
+        ax.tick_params(axis="both", which="major", labelsize=FS_TICK)
 
         legend_handles.append(
             Line2D([], [], color="black", linestyle="-", lw=2.0, label="1σ ellipse")
@@ -564,7 +573,7 @@ def main():
                    markersize=5, label="Training designs")
         )
         ax.legend(handles=legend_handles, loc="lower right",
-                  fontsize=8.5, framealpha=0.85)
+                  fontsize=FS_LEGEND, framealpha=0.85)
 
         plt.tight_layout()
 
@@ -637,35 +646,38 @@ def main():
 
                 if best_score > 0:
                     ax3d.text(s_val, l_val, g_val, f"  {best_score}",
-                              fontsize=6.5, color=color)
+                              fontsize=FS_ANNOT, color=color)
 
         # Axis limits and labels
         ax3d.set_xlim(spcf_lo, spcf_hi)
         ax3d.set_ylim(leg_lo,  leg_hi)
         ax3d.set_zlim(gcr_lo,  gcr_hi)
-        ax3d.set_xlabel("Spring Coefficient (spcf)", labelpad=10)
-        ax3d.set_ylabel("Leg Length (leg)",           labelpad=10)
-        ax3d.set_zlabel("GCR",                        labelpad=10)
+        ax3d.set_xlabel(
+            "Spring Coefficient (spcf)", fontsize=FS_AXIS, labelpad=14)
+        ax3d.set_ylabel(
+            "Leg Length (leg)", fontsize=FS_AXIS, labelpad=14)
+        ax3d.set_zlabel("GCR", fontsize=FS_AXIS, labelpad=14)
         ax3d.xaxis.set_major_formatter(
             matplotlib.ticker.FormatStrFormatter("%.4f"))
         ax3d.tick_params(axis="x", rotation=30)
+        ax3d.tick_params(axis="both", which="major", labelsize=FS_TICK)
 
         ax3d.set_title(
             f"PEC 3D Gaussian Mixture — {args.run_name}{title_itr}",
-            fontsize=11, pad=15,
+            fontsize=FS_TITLE, pad=18,
         )
 
         legend_handles = _build_legend_handles(
             with_frontier=frontier_data is not None)
         ax3d.legend(handles=legend_handles, loc="upper left",
-                    fontsize=8, framealpha=0.85)
+                    fontsize=FS_LEGEND, framealpha=0.85)
 
         plt.tight_layout()
 
     # ── Save or show ──────────────────────────────────────────────────────────
     if args.output:
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
-        plt.savefig(args.output, dpi=150, bbox_inches="tight")
+        plt.savefig(args.output, dpi=200, bbox_inches="tight")
         print(f"[INFO] Figure saved to: {args.output}")
     else:
         plt.show()
