@@ -41,7 +41,7 @@ init_seed: 0                # Preferred global seed for stochastic center placem
                             # and initial design sampling. If omitted in CLI/config,
                             # pec_init.py falls back to `seed`.
 
-init_anchor_region: "top_right"
+init_anchor_region: null
                             # Optional seeded anchor for stochastic_fps.
                             #   null        — no forced region
                             #   "top_right" — guarantee one initial expert starts
@@ -53,7 +53,7 @@ target_init_coverage: 0.12  # Optional MC coverage target in (0, 1).
                             # For stochastic_fps, null means: match the legacy
                             # grid coverage at the same K and sigma_scale.
 
-usd_rel_path: morphologies/hetero_library_hvyBloon_ramp_lab03.17.2026/hetero_0001_fl0.227_tl0.285/hetero_0001_fl0.227_tl0.285.usd
+usd_rel_path: morphologies/hetero_library_hvyBloon_ramp_lab03.17.2026/hetero_0000_fl0.286_tl0.215/hetero_0000_fl0.286_tl0.215.usd
                             # Relative path to the robot USD file; injected into
                             # every Isaac Sim subprocess as BALLU_USD_REL_PATH.
                             # Example:
@@ -92,7 +92,7 @@ dl_buffer: 2                # Safety margin for auto-scaling --dl in later itera
 
 task: "Isc-BALLU-hetero-general-ramp"  # Isaac Lab task name
 
-num_envs: 1024              # Parallel simulation environments per training run
+num_envs: 4096              # Parallel simulation environments per training run
 max_iterations_iter0: 1700  # PPO steps for PEC iteration 0 (train from scratch — needs more)
 max_iterations: 500         # PPO steps for PEC iterations >= 1 (warm-start — fewer needed)
 headless: true              # Run Isaac Sim without a display
@@ -140,6 +140,6 @@ min_designs: 2              # Minimum number of assigned designs required before
 
 # ── Paths ────────────────────────────────────────────────────
 
-log_root: "logs/pec/2026.03.31"        # Root directory for all PEC state and result files.
+log_root: "logs/pec/2026.04.07"        # Root directory for all PEC state and result files.
                                        # State file: logs/pec/<run_name>/pec_state.json
                                        # Run from ballu_isclb_extension/.

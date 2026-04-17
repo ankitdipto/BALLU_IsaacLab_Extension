@@ -41,7 +41,7 @@ init_seed: 0                # Preferred global seed for stochastic center placem
                             # and initial design sampling. If omitted in CLI/config,
                             # pec_init.py falls back to `seed`.
 
-init_anchor_region: "top_right"
+init_anchor_region: null
                             # Optional seeded anchor for stochastic_fps.
                             #   null        — no forced region
                             #   "top_right" — guarantee one initial expert starts
