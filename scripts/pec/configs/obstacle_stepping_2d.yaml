@@ -140,6 +140,6 @@ min_designs: 2              # Minimum number of assigned designs required before
 
 # ── Paths ────────────────────────────────────────────────────
 
-log_root: "logs/pec/2026.03.31"        # Root directory for all PEC state and result files.
+log_root: "logs/pec/2026.04.14"        # Root directory for all PEC state and result files.
                                        # State file: logs/pec/<run_name>/pec_state.json
                                        # Run from ballu_isclb_extension/.
