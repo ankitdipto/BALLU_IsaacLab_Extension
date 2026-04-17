@@ -56,7 +56,7 @@ class BALLUSceneDynamicCfg(InteractiveSceneCfg):
     terrain = AssetBaseCfg(
         prim_path="/World/ground",
         spawn=sim_utils.GroundPlaneCfg(
-            size=(200.0, 200.0),
+            size=(300.0, 300.0),
             physics_material=sim_utils.RigidBodyMaterialCfg(
                 static_friction=0.5,
                 dynamic_friction=0.5,
