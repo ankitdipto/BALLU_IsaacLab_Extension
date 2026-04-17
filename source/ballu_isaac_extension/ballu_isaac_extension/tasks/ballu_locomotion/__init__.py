@@ -189,7 +189,7 @@ gym.register(
 )
 
 gym.register(
-    id="Isc-BALLU-hetero-pretrain-soft-moe",
+    id="Isc-BALLU-hetero-pretrain-soft-moe-obstacle",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
@@ -199,7 +199,7 @@ gym.register(
 )
 
 gym.register(
-    id="Isc-BALLU-hetero-general-soft-moe",
+    id="Isc-BALLU-hetero-general-soft-moe-obstacle",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
     disable_env_checker=True,
     kwargs={
@@ -208,6 +208,25 @@ gym.register(
     }
 )
 
+gym.register(
+    id="Isc-BALLU-hetero-pretrain-soft-moe-ramp",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.ramp_hetero_pretrain_env_cfg:BalluRampHeteroDynamicEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSoftMoEPPORunnerCfg"
+    }
+)
+
+gym.register(
+    id="Isc-BALLU-hetero-general-soft-moe-ramp",
+    entry_point="isaaclab.envs:ManagerBasedRLEnv",
+    disable_env_checker=True,
+    kwargs={
+        "env_cfg_entry_point": f"{__name__}.ramp_hetero_general_env_cfg:BalluSingleRampHeteroEnvCfg",
+        "rsl_rl_cfg_entry_point": f"{agents.__name__}.rsl_rl_ppo_cfg:BALLUSoftMoEPPORunnerCfg"
+    }
+)
 gym.register(
     id="Isc-BALLU-ramp-locomotion",
     entry_point="isaaclab.envs:ManagerBasedRLEnv",
